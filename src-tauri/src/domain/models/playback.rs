@@ -31,6 +31,13 @@ pub struct PlaybackState {
     pub current_track: Option<Track>,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct AudioSource {
+    pub url: String,
+    pub is_local: bool,
+    pub file_path: Option<String>,
+}
+
 impl Default for PlaybackState {
     fn default() -> Self {
         Self {

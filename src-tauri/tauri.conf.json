@@ -4,21 +4,30 @@
   "version": "0.1.0",
   "identifier": "com.minakow.freakcloud",
   "build": {
-    "beforeDevCommand": "bun run dev",
+    "beforeDevCommand": "npm run dev",
     "devUrl": "http://localhost:1420",
-    "beforeBuildCommand": "bun run build",
+    "beforeBuildCommand": "npm run build",
     "frontendDist": "../dist"
   },
   "app": {
+    "withGlobalTauri": true,
     "windows": [
       {
         "title": "freackcloud",
-        "width": 800,
-        "height": 600
+        "label": "main",
+        "width": 1100,
+        "height": 720,
+        "minWidth": 800,
+        "minHeight": 550,
+        "decorations": false
       }
     ],
     "security": {
-      "csp": null
+      "csp": null,
+      "assetProtocol": {
+        "enable": true,
+        "scope": ["$CACHE/**", "$APPDATA/**", "**"]
+      }
     }
   },
   "bundle": {

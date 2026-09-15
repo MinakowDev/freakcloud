@@ -1,0 +1,113 @@
+.sidebar-radio-container {
+  --main-color: #f7e479;
+  --main-color-opacity: #f7e4791c;
+  --total-radio: 3;
+
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  padding-left: 0.5rem;
+}
+
+.sidebar-radio-container input {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+  margin: 0;
+  cursor: pointer;
+  appearance: none;
+}
+
+.sidebar-radio-container .glider-container {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  background: linear-gradient(
+    0deg,
+    rgba(0, 0, 0, 0) 0%,
+    rgba(39, 39, 42, 1) 50%,
+    rgba(0, 0, 0, 0) 100%
+  );
+  width: 1px;
+}
+
+.sidebar-radio-container .glider-container .glider {
+  position: relative;
+  height: calc(100% / var(--total-radio));
+  width: 100%;
+  opacity: 0;
+  background: linear-gradient(
+    0deg,
+    rgba(0, 0, 0, 0) 0%,
+    var(--main-color) 50%,
+    rgba(0, 0, 0, 0) 100%
+  );
+  transition: opacity 0.3s ease, transform 0.5s cubic-bezier(0.37, 1.95, 0.66, 0.56);
+}
+
+.sidebar-radio-container input:checked ~ .glider-container .glider {
+  opacity: 1;
+}
+
+.sidebar-radio-container .glider-container .glider::before {
+  content: "";
+  position: absolute;
+  height: 60%;
+  width: 300%;
+  top: 50%;
+  transform: translateY(-50%);
+  background: var(--main-color);
+  filter: blur(10px);
+  pointer-events: none;
+}
+
+.sidebar-radio-container .glider-container .glider::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  height: 100%;
+  width: 160px;
+  background: linear-gradient(
+    90deg,
+    var(--main-color-opacity) 0%,
+    rgba(0, 0, 0, 0) 100%
+  );
+  pointer-events: none;
+}
+
+.sidebar-radio-container label {
+  cursor: pointer;
+  padding: 0.75rem 0.85rem;
+  position: relative;
+  color: #a1a1aa;
+  transition: all 0.3s ease-in-out;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  font-size: 0.875rem;
+  user-select: none;
+  border-radius: 0.5rem;
+}
+
+.sidebar-radio-container label:hover {
+  color: #ffffff;
+}
+
+.sidebar-radio-container input:checked + label {
+  color: var(--main-color);
+  font-weight: 600;
+}
+
+.sidebar-radio-container input:nth-of-type(1):checked ~ .glider-container .glider {
+  transform: translateY(0);
+}
+
+.sidebar-radio-container input:nth-of-type(2):checked ~ .glider-container .glider {
+  transform: translateY(100%);
+}
+
+.sidebar-radio-container input:nth-of-type(3):checked ~ .glider-container .glider {
+  transform: translateY(200%);
+}

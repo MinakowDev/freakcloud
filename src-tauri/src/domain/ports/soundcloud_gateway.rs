@@ -28,6 +28,15 @@ pub trait SoundCloudGateway: Send + Sync {
     /// Установка или сброс токена авторизации в клиенте
     async fn set_auth_token(&self, token: Option<String>) -> Result<(), DomainError>;
 
+    /// Добавление трека в понравившиеся
+    async fn like_track(&self, track_id: u64) -> Result<(), DomainError>;
+
+    /// Удаление трека из понравившихся
+    async fn unlike_track(&self, track_id: u64) -> Result<(), DomainError>;
+
+    /// Получение похожих/рекомендованных треков (SoundCloud Related Tracks)
+    async fn get_related_tracks(&self, track_id: u64, limit: u32) -> Result<Vec<Track>, DomainError>;
+
     /// Проверка, активен ли токен авторизации
     async fn is_authenticated(&self) -> bool;
 }

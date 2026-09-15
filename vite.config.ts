@@ -25,8 +25,8 @@ export default defineConfig(() => ({
         }
       : undefined,
     watch: {
-      // 3. tell Vite to ignore watching `src-tauri`
-      ignored: ["**/src-tauri/**"],
+      // 3. tell Vite to ignore watching `src-tauri` and media files that can cause EBUSY on Windows
+      ignored: ["**/src-tauri/**", "**/public/sfx/**", "**/*.mp3"],
     },
   },
 }));

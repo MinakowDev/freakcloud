@@ -1,7 +1,53 @@
-# Tauri + React + Typescript
+# freackcloud
 
-This template should help get you started developing with Tauri, React and Typescript in Vite.
+<p align="center">
+  <img src="public/logo.png" alt="freackcloud logo" width="96" height="96" />
+</p>
 
-## Recommended IDE Setup
+<p align="center">
+  <strong>A modern, lightweight desktop music player for SoundCloud.</strong><br>
+  Engineered with Tauri 2, Rust, React, and a local behavioral Taste Graph.
+</p>
 
-- [VS Code](https://code.visualstudio.com/) + [Tauri](https://marketplace.visualstudio.com/items?itemName=tauri-apps.tauri-vscode) + [rust-analyzer](https://marketplace.visualstudio.com/items?itemName=rust-lang.rust-analyzer)
+<p align="center">
+  <img src="https://img.shields.io/badge/Tauri-v2-blue?style=flat-square&logo=tauri" alt="Tauri">
+  <img src="https://img.shields.io/badge/Rust-Tokio-orange?style=flat-square&logo=rust" alt="Rust">
+  <img src="https://img.shields.io/badge/React-18-61dafb?style=flat-square&logo=react" alt="React">
+  <img src="https://img.shields.io/badge/TypeScript-Strict-3178c6?style=flat-square&logo=typescript" alt="TypeScript">
+  <img src="https://img.shields.io/badge/TailwindCSS-Cyber_Dark-38bdf8?style=flat-square&logo=tailwindcss" alt="Tailwind">
+</p>
+
+---
+
+## ✨ Features
+
+- **Personal Wave & Infinite Flow**: Continuous music stream powered by SoundCloud Track Stations blended with a client-side **Taste Graph** (exponential time-decay, completion bonuses, skip penalties).
+- **Offline Audio Cache**: Seamless local MP3 caching with an embedded loopback audio server for instant offline playback.
+- **Crossfade Transitions**: Smooth Spotify-like audio crossfading between tracks.
+- **SoundCloud Sync**: Embedded OAuth authorization, synchronization of your liked tracks and personal profile.
+
+---
+
+## 🛠 Tech Stack
+
+| Layer | Technologies |
+| :--- | :--- |
+| **Frontend** | React 18, TypeScript, Vite, Tailwind CSS, Remix Icon |
+| **Backend & Runtime** | Tauri v2, Rust, Tokio, Reqwest, Hyper (Loopback Audio Server) |
+| **Recommendation Engine** | Hybrid: SoundCloud Track Stations + Client Taste Graph (Collaborative Filtering + Heuristic Ranking) |
+
+---
+
+## 📜 Architecture
+
+- `src-tauri/src/domain/`: Core business models, traits, and ports (`SoundCloudGateway`, `AudioCacheGateway`).
+- `src-tauri/src/infrastructure/`: SoundCloud API adapter, local audio cache file storage, and loopback streaming server.
+- `src-tauri/src/interfaces/`: Tauri IPC commands and event emitters.
+- `src/entities/`: Feature-Sliced Design domain entities (`track`, `player`, `session`).
+- `src/widgets/`: Modular UI widgets (`queue-aside`, `wave-deck`, `player-dock`, `sidebar`, `header`).
+
+---
+
+## 📄 License
+
+MIT License. Designed with precision for pure listening pleasure.

@@ -147,9 +147,115 @@ impl SoundCloudGateway for RSoundCloudAdapter {
     }
 
     async fn get_my_likes(&self, limit: u32) -> Result<Vec<Track>, DomainError> {
-        let _ = limit;
-        // If authenticated, we can return recent likes; for now returns an empty list or searches library
-        Ok(Vec::new())
+        let token = match self.current_token.read().await.as_ref() {
+            Some(t) if !t.trim().is_empty() => t.trim().to_string(),
+            _ => return Err(DomainError::Unauthorized),
+        };
+
+        let me = self.get_me().await?;
+
+        #[derive(serde::Deserialize)]
+        struct LikeUserData {
+            id: Option<u64>,
+            username: Option<String>,
+        }
+
+        #[derive(serde::Deserialize)]
+        struct LikeTrackData {
+            id: u64,
+            title: String,
+            user: LikeUserData,
+            duration: u64,
+            artwork_url: Option<String>,
+            waveform_url: Option<String>,
+            playback_count: Option<u64>,
+            likes_count: Option<u64>,
+            genre: Option<String>,
+            permalink_url: Option<String>,
+        }
+
+        #[derive(serde::Deserialize)]
+        struct LikeCollectionItem {
+            track: Option<LikeTrackData>,
+            id: Option<u64>,
+            title: Option<String>,
+            user: Option<LikeUserData>,
+            duration: Option<u64>,
+            artwork_url: Option<String>,
+            waveform_url: Option<String>,
+            playback_count: Option<u64>,
+            likes_count: Option<u64>,
+            genre: Option<String>,
+            permalink_url: Option<String>,
+        }
+
+        #[derive(serde::Deserialize)]
+        struct LikesApiResponse {
+            collection: Vec<LikeCollectionItem>,
+        }
+
+        let limit = if limit == 0 { 50 } else { limit };
+        let url = format!("https://api-v2.soundcloud.com/users/{}/track_likes?limit={}", me.id, limit);
+
+        let resp = match self.http.get(&url).header("Authorization", format!("OAuth {}", token)).send().await {
+            Ok(r) if r.status().is_success() => r,
+            _ => {
+                let fallback_url = format!("https://api-v2.soundcloud.com/me/likes/tracks?limit={}", limit);
+                self.http.get(&fallback_url)
+                    .header("Authorization", format!("OAuth {}", token))
+                    .send()
+                    .await
+                    .map_err(|e| DomainError::Network(format!("Failed to fetch likes: {}", e)))?
+            }
+        };
+
+        if !resp.status().is_success() {
+            return Err(DomainError::SoundCloud(format!("Failed to fetch likes, HTTP {}", resp.status())));
+        }
+
+        let data: LikesApiResponse = resp.json().await
+            .map_err(|e| DomainError::SoundCloud(format!("Failed to parse likes response: {}", e)))?;
+
+        let mut tracks = Vec::new();
+        for item in data.collection {
+            if let Some(t) = item.track {
+                tracks.push(Track {
+                    id: t.id,
+                    title: t.title,
+                    artist: t.user.username.unwrap_or_else(|| "SoundCloud Artist".to_string()),
+                    artist_id: t.user.id,
+                    duration_ms: t.duration as u32,
+                    artwork_url: t.artwork_url,
+                    waveform_url: t.waveform_url,
+                    stream_url: None,
+                    playback_count: t.playback_count,
+                    likes_count: t.likes_count,
+                    genre: t.genre,
+                    permalink_url: t.permalink_url.unwrap_or_default(),
+                });
+            } else if let Some(id) = item.id {
+                let (artist, artist_id) = match item.user {
+                    Some(u) => (u.username.unwrap_or_else(|| "SoundCloud Artist".to_string()), u.id),
+                    None => ("SoundCloud Artist".to_string(), None),
+                };
+                tracks.push(Track {
+                    id,
+                    title: item.title.unwrap_or_else(|| "Unknown Track".to_string()),
+                    artist,
+                    artist_id,
+                    duration_ms: item.duration.unwrap_or(0) as u32,
+                    artwork_url: item.artwork_url,
+                    waveform_url: item.waveform_url,
+                    stream_url: None,
+                    playback_count: item.playback_count,
+                    likes_count: item.likes_count,
+                    genre: item.genre,
+                    permalink_url: item.permalink_url.unwrap_or_default(),
+                });
+            }
+        }
+
+        Ok(tracks)
     }
 
     async fn get_trending(&self, genre: Option<&str>, limit: u32) -> Result<Vec<Track>, DomainError> {
@@ -167,6 +273,210 @@ impl SoundCloudGateway for RSoundCloudAdapter {
         *client_guard = new_client;
         *self.current_token.write().await = token;
         Ok(())
+    }
+
+    async fn like_track(&self, track_id: u64) -> Result<(), DomainError> {
+        let token = match self.current_token.read().await.as_ref() {
+            Some(t) if !t.trim().is_empty() => t.trim().to_string(),
+            _ => return Err(DomainError::Unauthorized),
+        };
+
+        if let Ok(me) = self.get_me().await {
+            let url = format!("https://api-v2.soundcloud.com/users/{}/track_likes/{}", me.id, track_id);
+            let resp = self.http.post(&url)
+                .header("Authorization", format!("OAuth {}", token))
+                .header("Accept", "application/json")
+                .send()
+                .await;
+
+            if let Ok(r) = resp {
+                if r.status().is_success() || r.status().as_u16() == 201 {
+                    return Ok(());
+                }
+            }
+        }
+
+        let fallback_url = format!("https://api.soundcloud.com/likes/tracks/{}", track_id);
+        let resp = self.http.post(&fallback_url)
+            .header("Authorization", format!("OAuth {}", token))
+            .header("Accept", "application/json")
+            .send()
+            .await
+            .map_err(|e| DomainError::Network(format!("Failed to like track: {}", e)))?;
+
+        if resp.status().is_success() || resp.status().as_u16() == 201 {
+            Ok(())
+        } else {
+            Err(DomainError::SoundCloud(format!("Failed to like track, HTTP {}", resp.status())))
+        }
+    }
+
+    async fn unlike_track(&self, track_id: u64) -> Result<(), DomainError> {
+        let token = match self.current_token.read().await.as_ref() {
+            Some(t) if !t.trim().is_empty() => t.trim().to_string(),
+            _ => return Err(DomainError::Unauthorized),
+        };
+
+        if let Ok(me) = self.get_me().await {
+            let url = format!("https://api-v2.soundcloud.com/users/{}/track_likes/{}", me.id, track_id);
+            let resp = self.http.delete(&url)
+                .header("Authorization", format!("OAuth {}", token))
+                .header("Accept", "application/json")
+                .send()
+                .await;
+
+            if let Ok(r) = resp {
+                if r.status().is_success() || r.status().as_u16() == 200 || r.status().as_u16() == 204 {
+                    return Ok(());
+                }
+            }
+        }
+
+        let fallback_url = format!("https://api.soundcloud.com/likes/tracks/{}", track_id);
+        let resp = self.http.delete(&fallback_url)
+            .header("Authorization", format!("OAuth {}", token))
+            .header("Accept", "application/json")
+            .send()
+            .await
+            .map_err(|e| DomainError::Network(format!("Failed to unlike track: {}", e)))?;
+
+        if resp.status().is_success() || resp.status().as_u16() == 200 || resp.status().as_u16() == 204 {
+            Ok(())
+        } else {
+            Err(DomainError::SoundCloud(format!("Failed to unlike track, HTTP {}", resp.status())))
+        }
+    }
+
+    async fn get_related_tracks(&self, track_id: u64, limit: u32) -> Result<Vec<Track>, DomainError> {
+        #[derive(serde::Deserialize)]
+        struct RelatedUserData {
+            id: Option<u64>,
+            username: Option<String>,
+        }
+
+        #[derive(serde::Deserialize)]
+        struct RelatedTrackData {
+            id: u64,
+            title: String,
+            user: RelatedUserData,
+            duration: u64,
+            artwork_url: Option<String>,
+            waveform_url: Option<String>,
+            playback_count: Option<u64>,
+            likes_count: Option<u64>,
+            genre: Option<String>,
+            permalink_url: Option<String>,
+        }
+
+        #[derive(serde::Deserialize)]
+        struct RelatedItem {
+            track: Option<RelatedTrackData>,
+            id: Option<u64>,
+            title: Option<String>,
+            user: Option<RelatedUserData>,
+            duration: Option<u64>,
+            artwork_url: Option<String>,
+            waveform_url: Option<String>,
+            playback_count: Option<u64>,
+            likes_count: Option<u64>,
+            genre: Option<String>,
+            permalink_url: Option<String>,
+        }
+
+        #[derive(serde::Deserialize)]
+        struct RelatedResponse {
+            collection: Option<Vec<RelatedItem>>,
+        }
+
+        let limit = if limit == 0 { 20 } else { limit };
+        let station_url = format!("https://api-v2.soundcloud.com/stations/soundcloud:track-stations:{}/tracks?limit={}", track_id, limit);
+        let related_url = format!("https://api-v2.soundcloud.com/tracks/{}/related?limit={}", track_id, limit);
+
+        let token = self.current_token.read().await.clone();
+
+        let mut data: Option<RelatedResponse> = None;
+
+        // 1. Попытка получить через track-stations (дает более высокое качество подборки и радио-поток)
+        let mut req = self.http.get(&station_url).header("Accept", "application/json");
+        if let Some(ref t) = token {
+            if !t.trim().is_empty() {
+                req = req.header("Authorization", format!("OAuth {}", t.trim()));
+            }
+        }
+
+        if let Ok(resp) = req.send().await {
+            if resp.status().is_success() {
+                if let Ok(parsed) = resp.json::<RelatedResponse>().await {
+                    if let Some(ref col) = parsed.collection {
+                        if !col.is_empty() {
+                            data = Some(parsed);
+                        }
+                    }
+                }
+            }
+        }
+
+        // 2. Если track-stations не вернул треков, пробуем fallback на /tracks/{id}/related
+        if data.is_none() {
+            let mut req = self.http.get(&related_url).header("Accept", "application/json");
+            if let Some(ref t) = token {
+                if !t.trim().is_empty() {
+                    req = req.header("Authorization", format!("OAuth {}", t.trim()));
+                }
+            }
+            if let Ok(resp) = req.send().await {
+                if resp.status().is_success() {
+                    if let Ok(parsed) = resp.json::<RelatedResponse>().await {
+                        data = Some(parsed);
+                    }
+                }
+            }
+        }
+
+        let data = data.ok_or_else(|| DomainError::SoundCloud("Failed to fetch tracks from track-station or related".to_string()))?;
+
+        let mut tracks = Vec::new();
+        if let Some(items) = data.collection {
+            for item in items {
+                if let Some(t) = item.track {
+                    tracks.push(Track {
+                        id: t.id,
+                        title: t.title,
+                        artist: t.user.username.unwrap_or_else(|| "SoundCloud Artist".to_string()),
+                        artist_id: t.user.id,
+                        duration_ms: t.duration as u32,
+                        artwork_url: t.artwork_url,
+                        waveform_url: t.waveform_url,
+                        stream_url: None,
+                        playback_count: t.playback_count,
+                        likes_count: t.likes_count,
+                        genre: t.genre,
+                        permalink_url: t.permalink_url.unwrap_or_default(),
+                    });
+                } else if let Some(id) = item.id {
+                    let (artist, artist_id) = match item.user {
+                        Some(u) => (u.username.unwrap_or_else(|| "SoundCloud Artist".to_string()), u.id),
+                        None => ("SoundCloud Artist".to_string(), None),
+                    };
+                    tracks.push(Track {
+                        id,
+                        title: item.title.unwrap_or_else(|| "Unknown Track".to_string()),
+                        artist,
+                        artist_id,
+                        duration_ms: item.duration.unwrap_or(0) as u32,
+                        artwork_url: item.artwork_url,
+                        waveform_url: item.waveform_url,
+                        stream_url: None,
+                        playback_count: item.playback_count,
+                        likes_count: item.likes_count,
+                        genre: item.genre,
+                        permalink_url: item.permalink_url.unwrap_or_default(),
+                    });
+                }
+            }
+        }
+
+        Ok(tracks)
     }
 
     async fn is_authenticated(&self) -> bool {

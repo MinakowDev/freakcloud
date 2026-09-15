@@ -1,0 +1,131 @@
+.wave-group {
+  position: relative;
+  width: 100%;
+  max-width: 380px;
+}
+
+.wave-group .wave-input {
+  font-size: 14px;
+  padding: 8px 28px 8px 28px;
+  display: block;
+  width: 100%;
+  border: none;
+  border-bottom: 1px solid #27272a;
+  background: transparent;
+  color: #ffffff;
+  font-family: inherit;
+  transition: border-color 0.2s ease;
+  outline: none;
+  box-shadow: none;
+}
+
+.wave-group .wave-input:focus,
+.wave-group .wave-input:active,
+.wave-group .wave-input:focus-visible {
+  outline: none !important;
+  box-shadow: none !important;
+  border-top: none !important;
+  border-left: none !important;
+  border-right: none !important;
+}
+
+.wave-group .wave-icon-left {
+  position: absolute;
+  left: 4px;
+  top: 9px;
+  color: #71717a;
+  font-size: 16px;
+  pointer-events: none;
+  transition: color 0.2s ease;
+}
+
+.wave-group .wave-input:focus ~ .wave-icon-left {
+  color: #ffffff;
+}
+
+.wave-group .wave-label {
+  color: #71717a;
+  font-size: 13px;
+  font-weight: 400;
+  position: absolute;
+  pointer-events: none;
+  left: 28px;
+  top: 9px;
+  display: flex;
+  user-select: none;
+}
+
+.wave-group .label-char {
+  display: inline-block;
+  transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1), font-size 0.25s ease, color 0.25s ease;
+  transition-delay: calc(var(--index) * 0.035s);
+}
+
+.wave-group .wave-input:focus ~ .wave-label .label-char,
+.wave-group .wave-input:not(:placeholder-shown) ~ .wave-label .label-char,
+.wave-group .wave-input.has-value ~ .wave-label .label-char {
+  transform: translateY(-20px);
+  font-size: 11px;
+  font-weight: 500;
+  color: #ffffff;
+  letter-spacing: 0.02em;
+}
+
+.wave-group .bar {
+  position: relative;
+  display: block;
+  width: 100%;
+}
+
+.wave-group .bar:before,
+.wave-group .bar:after {
+  content: '';
+  height: 2px;
+  width: 0;
+  bottom: 0;
+  position: absolute;
+  background: #ffffff;
+  box-shadow: none;
+  transition: width 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.wave-group .bar:before {
+  left: 50%;
+}
+
+.wave-group .bar:after {
+  right: 50%;
+}
+
+.wave-group .wave-input:focus ~ .bar:before,
+.wave-group .wave-input:focus ~ .bar:after {
+  width: 50%;
+}
+
+.wave-group .wave-clear-btn {
+  position: absolute;
+  right: 4px;
+  top: 8px;
+  color: #71717a;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: color 0.15s ease;
+  outline: none;
+  box-shadow: none;
+}
+
+.wave-group .wave-clear-btn:focus,
+.wave-group .wave-clear-btn:active,
+.wave-group .wave-clear-btn:focus-visible {
+  outline: none !important;
+  box-shadow: none !important;
+}
+
+.wave-group .wave-clear-btn:hover {
+  color: #ffffff;
+}

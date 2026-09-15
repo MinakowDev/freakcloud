@@ -1,0 +1,79 @@
+/* WaveDeck.css - Minimalist Personal Wave Deck */
+
+.wave-deck-card {
+  background: linear-gradient(135deg, rgba(24, 24, 27, 0.75) 0%, rgba(9, 9, 11, 0.9) 100%);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow:
+    0 16px 36px -10px rgba(0, 0, 0, 0.6),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(16px);
+  border-radius: 1.25rem;
+  padding: 1.15rem 1.5rem;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  user-select: none;
+  position: relative;
+  overflow: hidden;
+  width: 100%;
+}
+
+/* Equalizer Bars */
+.spectrum-bar {
+  width: 3.5px;
+  border-radius: 9999px;
+  background: #71717a;
+  height: 6px;
+  transition: height 0.2s ease, background-color 0.2s ease;
+}
+
+.spectrum-bar.playing {
+  background: #ffffff;
+  animation: eqBounce 1.1s ease-in-out infinite alternate;
+}
+
+@keyframes eqBounce {
+  0% {
+    height: 4px;
+    opacity: 0.4;
+  }
+  50% {
+    height: 26px;
+    opacity: 1;
+  }
+  100% {
+    height: 10px;
+    opacity: 0.7;
+  }
+}
+
+/* Launch Wave Button */
+.btn-launch-wave {
+  background: #ffffff;
+  color: #000000;
+  font-weight: 600;
+  font-size: 0.8125rem;
+  border-radius: 9999px;
+  padding: 0.55rem 1.3rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  box-shadow: 0 4px 16px rgba(255, 255, 255, 0.18);
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  cursor: pointer;
+  border: none;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.btn-launch-wave:hover {
+  background: #f4f4f5;
+  transform: translateY(-1px);
+  box-shadow: 0 6px 22px rgba(255, 255, 255, 0.28);
+}
+
+.btn-launch-wave:active {
+  transform: translateY(0);
+}
