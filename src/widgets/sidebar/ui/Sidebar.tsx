@@ -3,7 +3,7 @@ import { useTranslation } from '../../../shared/lib/i18n';
 import { useSession } from '../../../entities/session/model/session-context';
 import './SidebarGlider.css';
 
-export type PageView = 'home' | 'search' | 'library' | 'settings';
+export type PageView = 'home' | 'search' | 'library' | 'taste-graph' | 'settings';
 
 interface SidebarProps {
   currentPage: PageView;
@@ -18,6 +18,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentPage, onNavigate }) => 
     { id: 'home', label: messages.nav.home, icon: 'ri-home-5-line' },
     { id: 'search', label: messages.nav.search, icon: 'ri-search-line' },
     { id: 'library', label: messages.nav.library, icon: 'ri-folder-music-line' },
+    // { id: 'taste-graph', label: messages.nav.taste_graph, icon: 'ri-bubble-chart-line' },
   ];
 
   return (
@@ -30,7 +31,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentPage, onNavigate }) => 
         >
           <img src="/logo.png" alt="logo" className="w-5 h-5 object-contain" />
           <span className="font-headline-sm text-sm tracking-wider text-zinc-300 font-semibold">
-            freackcloud
+            freakcloud
           </span>
         </div>
 
@@ -68,11 +69,10 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentPage, onNavigate }) => 
         <button
           type="button"
           onClick={() => onNavigate('settings')}
-          className={`flex items-center gap-3 px-3.5 py-2.5 rounded-lg transition-colors cursor-pointer text-left w-full ${
-            currentPage === 'settings'
-              ? 'bg-zinc-900 text-white font-medium border border-zinc-800'
-              : 'text-zinc-400 hover:bg-zinc-900/60 hover:text-white'
-          }`}
+          className={`flex items-center gap-3 px-3.5 py-2.5 rounded-lg transition-colors cursor-pointer text-left w-full ${currentPage === 'settings'
+            ? 'bg-zinc-900 text-white font-medium border border-zinc-800'
+            : 'text-zinc-400 hover:bg-zinc-900/60 hover:text-white'
+            }`}
         >
           <i className="ri-settings-3-line text-lg leading-none"></i>
           <span className="font-body-md text-sm">{messages.nav.settings}</span>

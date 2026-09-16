@@ -22,7 +22,7 @@ impl LocalAudioCache {
             .or_else(dirs::data_dir)
             .ok_or_else(|| DomainError::Storage("Could not locate system cache directory".to_string()))?;
 
-        let cache_dir = base_dir.join("freackcloud");
+        let cache_dir = base_dir.join("freakcloud");
         let audio_dir = cache_dir.join("audio");
         let index_file = cache_dir.join("cache_index.json");
 

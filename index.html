@@ -1,10 +1,11 @@
 <!doctype html>
 <html class="dark" lang="ru">
-  <head>
+
+<head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/png" href="/logo.png" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>freackcloud</title>
+    <title>freakcloud</title>
     <link href="https://fonts.googleapis.com" rel="preconnect" />
     <link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect" />
     <link
@@ -13,7 +14,9 @@
     <link href="https://cdn.jsdelivr.net/npm/remixicon@4.2.0/fonts/remixicon.css" rel="stylesheet" />
     <style>
         @layer base {
-            html, body {
+
+            html,
+            body {
                 margin: 0;
                 padding: 0;
                 font-family: 'Delight', 'Plus Jakarta Sans', 'Outfit', sans-serif;
@@ -22,82 +25,86 @@
                 user-select: none;
                 -webkit-user-select: none;
             }
+
             body {
                 overscroll-behavior: none;
             }
         }
+
         ::-webkit-scrollbar {
             display: none;
         }
     </style>
-    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+    <script src="https://cdn.tailwindcss.com?plugins=container-queries"></script>
     <script id="tailwind-config">tailwind.config = {
-        darkMode: "class",
-        theme: {
-            extend: {
-                "colors": {
-                    "on-background": "#fafafa",
-                    "on-surface": "#fafafa",
-                    "on-surface-variant": "#a1a1aa",
-                    "surface-container-lowest": "#000000",
-                    "surface-container-low": "#111114",
-                    "surface-container": "#18181b",
-                    "surface-container-high": "#27272a",
-                    "surface-container-highest": "#323238",
-                    "surface-bright": "#3f3f46",
-                    "surface": "#09090b",
-                    "background": "#09090b",
-                    "primary": "#ffffff",
-                    "on-primary": "#000000",
-                    "primary-container": "#ffffff",
-                    "on-primary-container": "#000000",
-                    "secondary": "#a1a1aa",
-                    "on-secondary": "#ffffff",
-                    "outline": "#52525b",
-                    "outline-variant": "#27272a",
-                    "error": "#f87171"
-                },
-                "borderRadius": {
-                    "DEFAULT": "0.25rem",
-                    "lg": "0.5rem",
-                    "xl": "0.75rem",
-                    "full": "9999px"
-                },
-                "spacing": {
-                    "space-sm": "0.5rem",
-                    "space-xs": "0.25rem",
-                    "space-lg": "1rem",
-                    "margin": "1rem",
-                    "space-md": "0.75rem",
-                    "space-xl": "1.5rem",
-                    "gutter": "1rem"
-                },
-                "fontFamily": {
-                    "headline-lg": ["Delight", "Plus Jakarta Sans", "Outfit", "sans-serif"],
-                    "label-md": ["JetBrains Mono", "monospace"],
-                    "headline-md": ["Delight", "Plus Jakarta Sans", "Outfit", "sans-serif"],
-                    "body-md": ["Delight", "Plus Jakarta Sans", "Outfit", "sans-serif"],
-                    "body-lg": ["Delight", "Plus Jakarta Sans", "Outfit", "sans-serif"],
-                    "body-sm": ["Delight", "Plus Jakarta Sans", "Outfit", "sans-serif"],
-                    "label-sm": ["JetBrains Mono", "monospace"],
-                    "headline-sm": ["Delight", "Plus Jakarta Sans", "Outfit", "sans-serif"]
-                },
-                "fontSize": {
-                    "headline-lg": ["1.75rem", { "lineHeight": "2.25rem", "letterSpacing": "-0.02em", "fontWeight": "600" }],
-                    "label-md": ["0.8125rem", { "lineHeight": "1rem", "letterSpacing": "0.02em", "fontWeight": "500" }],
-                    "headline-md": ["1.375rem", { "lineHeight": "1.75rem", "letterSpacing": "-0.015em", "fontWeight": "600" }],
-                    "body-md": ["0.875rem", { "lineHeight": "1.25rem", "fontWeight": "400" }],
-                    "body-lg": ["0.9375rem", { "lineHeight": "1.375rem", "fontWeight": "400" }],
-                    "body-sm": ["0.8125rem", { "lineHeight": "1.125rem", "fontWeight": "400" }],
-                    "label-sm": ["0.6875rem", { "lineHeight": "0.875rem", "letterSpacing": "0.04em", "fontWeight": "500" }],
-                    "headline-sm": ["1.125rem", { "lineHeight": "1.5rem", "letterSpacing": "-0.01em", "fontWeight": "500" }]
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "on-background": "#fafafa",
+                        "on-surface": "#fafafa",
+                        "on-surface-variant": "#a1a1aa",
+                        "surface-container-lowest": "#000000",
+                        "surface-container-low": "#111114",
+                        "surface-container": "#18181b",
+                        "surface-container-high": "#27272a",
+                        "surface-container-highest": "#323238",
+                        "surface-bright": "#3f3f46",
+                        "surface": "#09090b",
+                        "background": "#09090b",
+                        "primary": "#ffffff",
+                        "on-primary": "#000000",
+                        "primary-container": "#ffffff",
+                        "on-primary-container": "#000000",
+                        "secondary": "#a1a1aa",
+                        "on-secondary": "#ffffff",
+                        "outline": "#52525b",
+                        "outline-variant": "#27272a",
+                        "error": "#f87171"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                    "spacing": {
+                        "space-sm": "0.5rem",
+                        "space-xs": "0.25rem",
+                        "space-lg": "1rem",
+                        "margin": "1rem",
+                        "space-md": "0.75rem",
+                        "space-xl": "1.5rem",
+                        "gutter": "1rem"
+                    },
+                    "fontFamily": {
+                        "headline-lg": ["Delight", "Plus Jakarta Sans", "Outfit", "sans-serif"],
+                        "label-md": ["JetBrains Mono", "monospace"],
+                        "headline-md": ["Delight", "Plus Jakarta Sans", "Outfit", "sans-serif"],
+                        "body-md": ["Delight", "Plus Jakarta Sans", "Outfit", "sans-serif"],
+                        "body-lg": ["Delight", "Plus Jakarta Sans", "Outfit", "sans-serif"],
+                        "body-sm": ["Delight", "Plus Jakarta Sans", "Outfit", "sans-serif"],
+                        "label-sm": ["JetBrains Mono", "monospace"],
+                        "headline-sm": ["Delight", "Plus Jakarta Sans", "Outfit", "sans-serif"]
+                    },
+                    "fontSize": {
+                        "headline-lg": ["1.75rem", { "lineHeight": "2.25rem", "letterSpacing": "-0.02em", "fontWeight": "600" }],
+                        "label-md": ["0.8125rem", { "lineHeight": "1rem", "letterSpacing": "0.02em", "fontWeight": "500" }],
+                        "headline-md": ["1.375rem", { "lineHeight": "1.75rem", "letterSpacing": "-0.015em", "fontWeight": "600" }],
+                        "body-md": ["0.875rem", { "lineHeight": "1.25rem", "fontWeight": "400" }],
+                        "body-lg": ["0.9375rem", { "lineHeight": "1.375rem", "fontWeight": "400" }],
+                        "body-sm": ["0.8125rem", { "lineHeight": "1.125rem", "fontWeight": "400" }],
+                        "label-sm": ["0.6875rem", { "lineHeight": "0.875rem", "letterSpacing": "0.04em", "fontWeight": "500" }],
+                        "headline-sm": ["1.125rem", { "lineHeight": "1.5rem", "letterSpacing": "-0.01em", "fontWeight": "500" }]
+                    }
                 }
             }
-        }
-    }</script>
-  </head>
-  <body class="bg-background font-body-md text-body-md text-on-surface antialiased select-none">
+        }</script>
+</head>
+
+<body class="bg-background font-body-md text-body-md text-on-surface antialiased select-none">
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
-  </body>
+</body>
+
 </html>

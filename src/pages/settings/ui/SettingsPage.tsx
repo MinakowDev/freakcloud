@@ -4,6 +4,7 @@ import { useCache } from '../../../entities/track/model/cache-context';
 import { formatBytes } from '../../../entities/track/lib/format-time';
 import { useTranslation } from '../../../shared/lib/i18n';
 import { Switch } from '../../../shared/ui/Switch';
+import { tauriApi } from '../../../shared/api/tauri-client';
 
 export const SettingsPage: React.FC = () => {
   const { session, loginWithToken, openOAuthModal, logout, isLoading, error } = useSession();
@@ -13,6 +14,17 @@ export const SettingsPage: React.FC = () => {
   const [tokenInput, setTokenInput] = useState('');
   const [showManualInput, setShowManualInput] = useState(false);
   const [cacheMessage, setCacheMessage] = useState<string | null>(null);
+  const [discordRpc, setDiscordRpc] = useState(() => {
+    return localStorage.getItem('discord_rpc_enabled') !== 'false';
+  });
+
+  const handleToggleDiscordRpc = async (enabled: boolean) => {
+    setDiscordRpc(enabled);
+    localStorage.setItem('discord_rpc_enabled', String(enabled));
+    if (tauriApi.isTauri()) {
+      await tauriApi.setDiscordRpcEnabled(enabled);
+    }
+  };
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -206,7 +218,33 @@ export const SettingsPage: React.FC = () => {
 
       <div className="h-[1px] w-full bg-zinc-900/80" />
 
-      {/* 3. About Section */}
+      {/* 3. Discord RPC Section */}
+      <section className="flex flex-col gap-space-md">
+        <div className="flex items-center gap-2 text-zinc-500 font-label-sm text-xs uppercase tracking-wider">
+          <i className="ri-discord-line text-[16px]"></i>
+          <span>{messages.settings.discord_section}</span>
+        </div>
+
+        <div className="flex items-center justify-between py-2">
+          <div className="flex flex-col pr-4 gap-0.5">
+            <span className="font-body-md text-white font-medium text-sm">
+              {messages.settings.discord_rpc_title}
+            </span>
+            <span className="font-label-sm text-xs text-zinc-500 max-w-md">
+              {messages.settings.discord_rpc_desc}
+            </span>
+          </div>
+
+          <Switch
+            checked={discordRpc}
+            onChange={handleToggleDiscordRpc}
+          />
+        </div>
+      </section>
+
+      <div className="h-[1px] w-full bg-zinc-900/80" />
+
+      {/* 4. About Section */}
       <section className="flex flex-col gap-1 text-zinc-500 py-1">
         <span className="font-body-md text-xs font-medium text-zinc-400">
           {messages.settings.app_name}

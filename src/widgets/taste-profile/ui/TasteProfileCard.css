@@ -1,0 +1,56 @@
+.taste-profile-card {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 18px 20px;
+  background: #080808;
+  border: 1px solid #181818;
+  border-radius: 2px;
+  height: 100%;
+  box-sizing: border-box;
+  user-select: none;
+}
+
+.taste-profile-card__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-bottom: 12px;
+  border-bottom: 1px solid #161616;
+}
+
+.taste-profile-card__empty {
+  font-size: 12px;
+  color: #52525b;
+  line-height: 1.6;
+  margin: 0;
+  flex: 1;
+}
+
+/* Industrial Action Button */
+.taste-profile-card__btn {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: auto;
+  padding: 8px 12px;
+  border-radius: 2px;
+  border: 1px solid #222222;
+  background: #0d0d0d;
+  color: #a1a1aa;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  font-family: inherit;
+  width: 100%;
+  outline: none !important;
+}
+
+.taste-profile-card__btn:hover {
+  background: #ffffff;
+  border-color: #ffffff;
+  color: #000000;
+}

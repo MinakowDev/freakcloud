@@ -4,26 +4,40 @@ use tokio::sync::RwLock;
 
 use rsoundcloud::{
     models::{track::Track as ScTrack, user::User as ScUser},
-    CollectionParams, MeApi, ResourceId, SearchApi, SoundCloudClient, TracksApi,
+    CollectionParams, MeApi, PlaylistsApi, ResourceId, SearchApi, SoundCloudClient, TracksApi,
 };
 
 use crate::domain::{
     errors::DomainError,
-    models::{Track, UserProfile},
+    models::{Playlist, Track, UserProfile},
     ports::SoundCloudGateway,
 };
 
 pub struct RSoundCloudAdapter {
-    client: Arc<RwLock<SoundCloudClient>>,
+    client: Arc<RwLock<Option<SoundCloudClient>>>,
     http: reqwest::Client,
     current_token: Arc<RwLock<Option<String>>>,
+    cached_client_id: Arc<RwLock<Option<String>>>,
 }
 
 impl RSoundCloudAdapter {
     pub async fn new(auth_token: Option<String>) -> Result<Self, DomainError> {
-        let sc_client = SoundCloudClient::new(None, auth_token.clone())
-            .await
-            .map_err(|e| DomainError::SoundCloud(format!("Failed to initialize SoundCloud client: {:?}", e)))?;
+        let sc_client = match SoundCloudClient::new(None, auth_token.clone()).await {
+            Ok(c) => Some(c),
+            Err(e) => {
+                eprintln!(
+                    "SoundCloud client startup initialization deferred (offline / blocked): {:?}",
+                    e
+                );
+                None
+            }
+        };
+
+        // Cache client_id for raw HTTP requests (like/unlike need it as query param)
+        let cached_client_id = match SoundCloudClient::generate_client_id().await {
+            Ok(id) => Some(id),
+            Err(_) => None,
+        };
 
         let http = reqwest::Client::builder()
             .user_agent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
@@ -34,7 +48,27 @@ impl RSoundCloudAdapter {
             client: Arc::new(RwLock::new(sc_client)),
             http,
             current_token: Arc::new(RwLock::new(auth_token)),
+            cached_client_id: Arc::new(RwLock::new(cached_client_id)),
         })
+    }
+
+    pub async fn ensure_client(&self) -> Result<(), DomainError> {
+        {
+            let guard = self.client.read().await;
+            if guard.is_some() {
+                return Ok(());
+            }
+        }
+
+        let mut guard = self.client.write().await;
+        if guard.is_none() {
+            let token = self.current_token.read().await.clone();
+            let sc_client = SoundCloudClient::new(None, token)
+                .await
+                .map_err(|e| DomainError::SoundCloud(format!("SoundCloud недоступен (проверьте подключение к сети или запустите zapret / VPN): {:?}", e)))?;
+            *guard = Some(sc_client);
+        }
+        Ok(())
     }
 
     fn map_track(sc: &ScTrack) -> Track {
@@ -70,7 +104,11 @@ impl RSoundCloudAdapter {
 #[async_trait]
 impl SoundCloudGateway for RSoundCloudAdapter {
     async fn search_tracks(&self, query: &str, limit: u32, offset: u32) -> Result<Vec<Track>, DomainError> {
-        let client = self.client.read().await;
+        self.ensure_client().await?;
+        let client_guard = self.client.read().await;
+        let client = client_guard.as_ref().ok_or_else(|| {
+            DomainError::SoundCloud("SoundCloud недоступен (запустите zapret или проверьте сеть)".to_string())
+        })?;
         let params = CollectionParams {
             limit: Some(limit),
             offset: Some(offset),
@@ -84,8 +122,90 @@ impl SoundCloudGateway for RSoundCloudAdapter {
         Ok(tracks.iter().map(Self::map_track).collect())
     }
 
+    async fn search_playlists(&self, query: &str, limit: u32, offset: u32) -> Result<Vec<Playlist>, DomainError> {
+        self.ensure_client().await?;
+        let client_guard = self.client.read().await;
+        let client = client_guard.as_ref().ok_or_else(|| {
+            DomainError::SoundCloud("SoundCloud недоступен (запустите zapret или проверьте сеть)".to_string())
+        })?;
+        let params = CollectionParams {
+            limit: Some(limit),
+            offset: Some(offset),
+        };
+
+        let items = client
+            .search_playlists(query.to_string(), params)
+            .await
+            .map_err(|e| DomainError::SoundCloud(format!("Search playlists failed: {:?}", e)))?;
+
+        // Исключаем альбомы (is_album == false), чтобы возвращать только плейлисты
+        let playlists = items
+            .into_iter()
+            .filter(|item| !item.album_playlist.is_album)
+            .map(|item| Playlist {
+                id: item.album_playlist.id,
+                title: item.album_playlist.title,
+                author: item.user.user.username,
+                author_id: Some(item.user.user.id),
+                duration_ms: (item.album_playlist.duration as u32).max(0),
+                artwork_url: item.album_playlist.artwork_url,
+                track_count: (item.album_playlist.track_count as u32).max(0),
+                permalink_url: Some(item.album_playlist.permalink_url),
+                is_album: false,
+                tracks: None,
+            })
+            .collect();
+
+        Ok(playlists)
+    }
+
+    async fn get_playlist(&self, playlist_id: u64) -> Result<Playlist, DomainError> {
+        self.ensure_client().await?;
+        let client_guard = self.client.read().await;
+        let client = client_guard.as_ref().ok_or_else(|| {
+            DomainError::SoundCloud("SoundCloud недоступен (запустите zapret или проверьте сеть)".to_string())
+        })?;
+
+        let p = client
+            .get_playlist(ResourceId::Id(playlist_id))
+            .await
+            .map_err(|e| DomainError::SoundCloud(format!("Failed to get playlist {}: {:?}", playlist_id, e)))?;
+
+        Ok(Playlist {
+            id: p.album_playlist.id,
+            title: p.album_playlist.title,
+            author: p.user.username,
+            author_id: Some(p.user.id),
+            duration_ms: (p.album_playlist.duration as u32).max(0),
+            artwork_url: p.album_playlist.artwork_url,
+            track_count: (p.album_playlist.track_count as u32).max(0),
+            permalink_url: Some(p.album_playlist.permalink_url),
+            is_album: p.album_playlist.is_album,
+            tracks: None,
+        })
+    }
+
+    async fn get_playlist_tracks(&self, playlist_id: u64) -> Result<Vec<Track>, DomainError> {
+        self.ensure_client().await?;
+        let client_guard = self.client.read().await;
+        let client = client_guard.as_ref().ok_or_else(|| {
+            DomainError::SoundCloud("SoundCloud недоступен (запустите zapret или проверьте сеть)".to_string())
+        })?;
+
+        let tracks = client
+            .get_playlist_tracks(ResourceId::Id(playlist_id))
+            .await
+            .map_err(|e| DomainError::SoundCloud(format!("Failed to get tracks for playlist {}: {:?}", playlist_id, e)))?;
+
+        Ok(tracks.iter().map(Self::map_track).collect())
+    }
+
     async fn get_track(&self, track_id: u64) -> Result<Track, DomainError> {
-        let client = self.client.read().await;
+        self.ensure_client().await?;
+        let client_guard = self.client.read().await;
+        let client = client_guard.as_ref().ok_or_else(|| {
+            DomainError::SoundCloud("SoundCloud недоступен (запустите zapret или проверьте сеть)".to_string())
+        })?;
         let sc_track = client
             .get_track(ResourceId::Id(track_id))
             .await
@@ -95,11 +215,17 @@ impl SoundCloudGateway for RSoundCloudAdapter {
     }
 
     async fn resolve_stream_url(&self, track_id: u64) -> Result<String, DomainError> {
-        let client = self.client.read().await;
-        let sc_track = client
-            .get_track(ResourceId::Id(track_id))
-            .await
-            .map_err(|e| DomainError::SoundCloud(format!("Failed to fetch track {}: {:?}", track_id, e)))?;
+        self.ensure_client().await?;
+        let sc_track = {
+            let client_guard = self.client.read().await;
+            let client = client_guard.as_ref().ok_or_else(|| {
+                DomainError::SoundCloud("SoundCloud недоступен (запустите zapret или проверьте сеть)".to_string())
+            })?;
+            client
+                .get_track(ResourceId::Id(track_id))
+                .await
+                .map_err(|e| DomainError::SoundCloud(format!("Failed to fetch track {}: {:?}", track_id, e)))?
+        };
 
         // Find progressive MP3 or HLS stream transcoding from track media
         let transcodings = &sc_track.track.media.transcodings;
@@ -137,7 +263,11 @@ impl SoundCloudGateway for RSoundCloudAdapter {
     }
 
     async fn get_me(&self) -> Result<UserProfile, DomainError> {
-        let client = self.client.read().await;
+        self.ensure_client().await?;
+        let client_guard = self.client.read().await;
+        let client = client_guard.as_ref().ok_or_else(|| {
+            DomainError::SoundCloud("SoundCloud недоступен (запустите zapret или проверьте сеть)".to_string())
+        })?;
         let me = client
             .get_me()
             .await
@@ -265,14 +395,19 @@ impl SoundCloudGateway for RSoundCloudAdapter {
 
     async fn set_auth_token(&self, token: Option<String>) -> Result<(), DomainError> {
         let mut client_guard = self.client.write().await;
-        let mut new_client = SoundCloudClient::new(None, token.clone())
-            .await
-            .map_err(|e| DomainError::SoundCloud(format!("Failed to re-initialize client: {:?}", e)))?;
-        
-        new_client.set_auth_token(token.clone());
-        *client_guard = new_client;
-        *self.current_token.write().await = token;
-        Ok(())
+        *self.current_token.write().await = token.clone();
+
+        match SoundCloudClient::new(None, token.clone()).await {
+            Ok(mut new_client) => {
+                new_client.set_auth_token(token);
+                *client_guard = Some(new_client);
+                Ok(())
+            }
+            Err(e) => {
+                *client_guard = None;
+                Err(DomainError::SoundCloud(format!("Failed to re-initialize client: {:?}", e)))
+            }
+        }
     }
 
     async fn like_track(&self, track_id: u64) -> Result<(), DomainError> {
@@ -281,30 +416,70 @@ impl SoundCloudGateway for RSoundCloudAdapter {
             _ => return Err(DomainError::Unauthorized),
         };
 
-        if let Ok(me) = self.get_me().await {
-            let url = format!("https://api-v2.soundcloud.com/users/{}/track_likes/{}", me.id, track_id);
-            let resp = self.http.post(&url)
+        // Lazily populate client_id cache
+        if self.cached_client_id.read().await.is_none() {
+            if let Ok(id) = SoundCloudClient::generate_client_id().await {
+                *self.cached_client_id.write().await = Some(id);
+            }
+        }
+        let client_id = self.cached_client_id.read().await.clone().unwrap_or_default();
+
+        // 1. Primary v2 API: PUT https://api-v2.soundcloud.com/likes/tracks/{track_id}?client_id=...
+        if !client_id.is_empty() {
+            let v2_url = format!(
+                "https://api-v2.soundcloud.com/likes/tracks/{}?client_id={}",
+                track_id, client_id
+            );
+            let resp = self.http.put(&v2_url)
                 .header("Authorization", format!("OAuth {}", token))
                 .header("Accept", "application/json")
+                .header("Origin", "https://soundcloud.com")
+                .header("Referer", "https://soundcloud.com/")
+                .header("Content-Length", "0")
                 .send()
                 .await;
 
             if let Ok(r) = resp {
-                if r.status().is_success() || r.status().as_u16() == 201 {
+                let status = r.status().as_u16();
+                if r.status().is_success() || status == 200 || status == 201 || status == 204 {
                     return Ok(());
                 }
+                eprintln!("[like_track] v2 PUT /likes/tracks/{} failed: {}", track_id, status);
+            }
+
+            // Also try POST if PUT fails
+            let resp_post = self.http.post(&v2_url)
+                .header("Authorization", format!("OAuth {}", token))
+                .header("Accept", "application/json")
+                .header("Origin", "https://soundcloud.com")
+                .header("Referer", "https://soundcloud.com/")
+                .header("Content-Length", "0")
+                .send()
+                .await;
+
+            if let Ok(r) = resp_post {
+                let status = r.status().as_u16();
+                if r.status().is_success() || status == 200 || status == 201 || status == 204 {
+                    return Ok(());
+                }
+                eprintln!("[like_track] v2 POST /likes/tracks/{} failed: {}", track_id, status);
             }
         }
 
-        let fallback_url = format!("https://api.soundcloud.com/likes/tracks/{}", track_id);
+        // 2. Fallback: v1 Public API POST https://api.soundcloud.com/likes/tracks/{track_id}
+        let fallback_url = format!(
+            "https://api.soundcloud.com/likes/tracks/{}?client_id={}&oauth_token={}",
+            track_id, client_id, token
+        );
         let resp = self.http.post(&fallback_url)
-            .header("Authorization", format!("OAuth {}", token))
+            .header("Content-Length", "0")
             .header("Accept", "application/json")
             .send()
             .await
             .map_err(|e| DomainError::Network(format!("Failed to like track: {}", e)))?;
 
-        if resp.status().is_success() || resp.status().as_u16() == 201 {
+        let status = resp.status().as_u16();
+        if resp.status().is_success() || status == 200 || status == 201 || status == 204 {
             Ok(())
         } else {
             Err(DomainError::SoundCloud(format!("Failed to like track, HTTP {}", resp.status())))
@@ -317,35 +492,55 @@ impl SoundCloudGateway for RSoundCloudAdapter {
             _ => return Err(DomainError::Unauthorized),
         };
 
-        if let Ok(me) = self.get_me().await {
-            let url = format!("https://api-v2.soundcloud.com/users/{}/track_likes/{}", me.id, track_id);
-            let resp = self.http.delete(&url)
+        if self.cached_client_id.read().await.is_none() {
+            if let Ok(id) = SoundCloudClient::generate_client_id().await {
+                *self.cached_client_id.write().await = Some(id);
+            }
+        }
+        let client_id = self.cached_client_id.read().await.clone().unwrap_or_default();
+
+        // 1. Primary v2 API: DELETE https://api-v2.soundcloud.com/likes/tracks/{track_id}?client_id=...
+        if !client_id.is_empty() {
+            let v2_url = format!(
+                "https://api-v2.soundcloud.com/likes/tracks/{}?client_id={}",
+                track_id, client_id
+            );
+            let resp = self.http.delete(&v2_url)
                 .header("Authorization", format!("OAuth {}", token))
                 .header("Accept", "application/json")
+                .header("Origin", "https://soundcloud.com")
+                .header("Referer", "https://soundcloud.com/")
                 .send()
                 .await;
 
             if let Ok(r) = resp {
-                if r.status().is_success() || r.status().as_u16() == 200 || r.status().as_u16() == 204 {
+                let status = r.status().as_u16();
+                if r.status().is_success() || status == 200 || status == 204 {
                     return Ok(());
                 }
+                eprintln!("[unlike_track] v2 DELETE /likes/tracks/{} failed: {}", track_id, status);
             }
         }
 
-        let fallback_url = format!("https://api.soundcloud.com/likes/tracks/{}", track_id);
+        // 2. Fallback: v1 Public API DELETE https://api.soundcloud.com/likes/tracks/{track_id}
+        let fallback_url = format!(
+            "https://api.soundcloud.com/likes/tracks/{}?client_id={}&oauth_token={}",
+            track_id, client_id, token
+        );
         let resp = self.http.delete(&fallback_url)
-            .header("Authorization", format!("OAuth {}", token))
             .header("Accept", "application/json")
             .send()
             .await
             .map_err(|e| DomainError::Network(format!("Failed to unlike track: {}", e)))?;
 
-        if resp.status().is_success() || resp.status().as_u16() == 200 || resp.status().as_u16() == 204 {
+        let status = resp.status().as_u16();
+        if resp.status().is_success() || status == 200 || status == 204 {
             Ok(())
         } else {
             Err(DomainError::SoundCloud(format!("Failed to unlike track, HTTP {}", resp.status())))
         }
     }
+
 
     async fn get_related_tracks(&self, track_id: u64, limit: u32) -> Result<Vec<Track>, DomainError> {
         #[derive(serde::Deserialize)]

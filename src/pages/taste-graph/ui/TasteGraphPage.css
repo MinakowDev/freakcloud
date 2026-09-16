@@ -1,0 +1,235 @@
+.tg-page {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  padding-bottom: 40px;
+  user-select: none;
+}
+
+/* Header */
+.tg-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-bottom: 16px;
+  border-bottom: 1px solid #161616;
+}
+
+/* Mode Switcher: Glass Radio Group with Spring Glider */
+.tg-glass-radio-group {
+  --bg: rgba(255, 255, 255, 0.05);
+  --text: #a1a1aa;
+
+  display: inline-flex;
+  position: relative;
+  background: var(--bg);
+  border-radius: 9999px;
+  backdrop-filter: blur(12px);
+  box-shadow:
+    inset 1px 1px 4px rgba(255, 255, 255, 0.12),
+    inset -1px -1px 6px rgba(0, 0, 0, 0.3),
+    0 4px 12px rgba(0, 0, 0, 0.15);
+  overflow: hidden;
+  width: fit-content;
+  padding: 2.5px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  user-select: none;
+}
+
+.tg-glass-radio-group input {
+  display: none;
+}
+
+.tg-glass-radio-group label {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-width: 96px;
+  font-size: 12px;
+  padding: 0.28rem 0.75rem;
+  cursor: pointer;
+  font-weight: 500;
+  letter-spacing: 0.15px;
+  color: var(--text);
+  position: relative;
+  z-index: 2;
+  transition: color 0.25s ease-in-out;
+  border-radius: 9999px;
+  white-space: nowrap;
+}
+
+.tg-glass-radio-group label:hover {
+  color: #ffffff;
+}
+
+.tg-glass-radio-group input:checked + label {
+  color: #ffffff;
+  font-weight: 600;
+}
+
+.tg-glass-glider {
+  position: absolute;
+  top: 2.5px;
+  bottom: 2.5px;
+  width: calc((100% - 5px) / 3);
+  border-radius: 9999px;
+  z-index: 1;
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.16), rgba(255, 255, 255, 0.05));
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  box-shadow:
+    0 0 14px rgba(255, 255, 255, 0.08),
+    0 0 6px rgba(255, 255, 255, 0.12) inset;
+  backdrop-filter: blur(8px);
+  transition: transform 0.45s cubic-bezier(0.37, 1.95, 0.66, 0.56);
+}
+
+#tg-tab-graph:checked ~ .tg-glass-glider {
+  transform: translateX(0%);
+}
+
+#tg-tab-list:checked ~ .tg-glass-glider {
+  transform: translateX(100%);
+}
+
+#tg-tab-blacklist:checked ~ .tg-glass-glider {
+  transform: translateX(200%);
+}
+
+/* Sub-tabs for list */
+.tg-tabs {
+  display: flex;
+  gap: 4px;
+  border-bottom: 1px solid #161616;
+  padding-bottom: 0;
+}
+
+.tg-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border-radius: 2px 2px 0 0;
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: #71717a;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  cursor: pointer;
+  outline: none !important;
+  transition: all 0.12s ease;
+  margin-bottom: -1px;
+}
+
+.tg-tab:hover {
+  color: #ffffff;
+}
+
+.tg-tab--active {
+  color: #ffffff;
+  border-bottom-color: #ffffff;
+}
+
+/* Flat List (No Bento boxes, matching TrackTable) */
+.tg-list {
+  display: flex;
+  flex-direction: column;
+}
+
+.tg-row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 10px 12px;
+  background: transparent;
+  border-bottom: 1px solid #111111;
+  transition: background 0.12s ease;
+}
+
+.tg-row:hover {
+  background: #111111;
+}
+
+.tg-row__rank {
+  font-size: 11px;
+  font-family: ui-monospace, SFMono-Regular, monospace;
+  color: #48484a;
+  width: 24px;
+  flex-shrink: 0;
+}
+
+.tg-row__info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  min-width: 0;
+}
+
+.tg-row__name {
+  font-size: 13px;
+  font-weight: 500;
+  color: #ffffff;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.tg-row__bar-track {
+  height: 2px;
+  background: #1a1a1a;
+  overflow: hidden;
+}
+
+.tg-row__bar-fill {
+  height: 100%;
+  background: #ffffff;
+  transition: width 0.4s ease;
+}
+
+/* Meta numbers */
+.tg-row__meta {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-shrink: 0;
+  font-family: ui-monospace, SFMono-Regular, monospace;
+  font-size: 10px;
+  color: #71717a;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.tg-row__score {
+  font-size: 11px;
+  font-weight: 600;
+  color: #ffffff;
+  width: 38px;
+  text-align: right;
+}
+
+/* Empty states */
+.tg-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 60px 20px;
+  text-align: center;
+}
+
+.tg-empty__title {
+  font-size: 14px;
+  color: #8e8e93;
+  margin: 0;
+}
+
+.tg-empty__hint {
+  font-size: 12px;
+  color: #52525b;
+  margin: 0;
+}

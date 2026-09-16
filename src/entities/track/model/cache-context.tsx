@@ -2,7 +2,7 @@ import React, { createContext, useContext, useEffect, useState, useCallback } fr
 import type { CacheStats, Track } from './types';
 import { tauriApi } from '../../../shared/api/tauri-client';
 
-const AUTO_CACHE_STORAGE_KEY = 'freackcloud_auto_cache';
+const AUTO_CACHE_STORAGE_KEY = 'freakcloud_auto_cache';
 
 interface CacheContextValue {
   cachedIds: Set<number>;

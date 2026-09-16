@@ -4,7 +4,7 @@ use crate::{
     application::AppState,
     domain::{
         errors::DomainError,
-        models::{AudioSource, CacheStats, Session, Track},
+        models::{AudioSource, CacheStats, Playlist, Session, Track},
     },
 };
 
@@ -176,7 +176,7 @@ pub async fn open_soundcloud_login(app: AppHandle) -> Result<(), DomainError> {
                     }
 
                     if (token) {
-                        window.location.href = "https://freackcloud.local/callback?token=" + encodeURIComponent(token);
+                        window.location.href = "https://freakcloud.local/callback?token=" + encodeURIComponent(token);
                     }
                 } catch (e) {
                     console.error('CheckAuth error:', e);
@@ -193,7 +193,7 @@ pub async fn open_soundcloud_login(app: AppHandle) -> Result<(), DomainError> {
         .center()
         .initialization_script(script)
         .on_navigation(move |nav_url| {
-            if nav_url.host_str() == Some("freackcloud.local") {
+            if nav_url.host_str() == Some("freakcloud.local") {
                 if let Some((_, token)) = nav_url.query_pairs().find(|(k, _)| k == "token") {
                     let token_str = token.to_string();
                     let app_inner = app_handle.clone();
@@ -217,4 +217,84 @@ pub async fn open_soundcloud_login(app: AppHandle) -> Result<(), DomainError> {
         .map_err(|e| DomainError::Unexpected(e.to_string()))?;
 
     Ok(())
+}
+
+#[tauri::command]
+pub async fn search_playlists(
+    state: State<'_, AppState>,
+    query: String,
+    limit: Option<u32>,
+    offset: Option<u32>,
+) -> Result<Vec<Playlist>, DomainError> {
+    state.manage_playlists.search(&query, limit, offset).await
+}
+
+#[tauri::command]
+pub async fn get_playlist_details(
+    state: State<'_, AppState>,
+    playlist_id: u64,
+) -> Result<Playlist, DomainError> {
+    state.manage_playlists.get_details(playlist_id).await
+}
+
+#[tauri::command]
+pub async fn get_saved_playlists(
+    state: State<'_, AppState>,
+) -> Result<Vec<Playlist>, DomainError> {
+    state.manage_playlists.get_saved().await
+}
+
+#[tauri::command]
+pub async fn save_playlist(
+    state: State<'_, AppState>,
+    playlist: Playlist,
+) -> Result<(), DomainError> {
+    state.manage_playlists.save(playlist).await
+}
+
+#[tauri::command]
+pub async fn remove_saved_playlist(
+    state: State<'_, AppState>,
+    playlist_id: u64,
+) -> Result<(), DomainError> {
+    state.manage_playlists.remove(playlist_id).await
+}
+
+#[tauri::command]
+pub async fn is_playlist_saved(
+    state: State<'_, AppState>,
+    playlist_id: u64,
+) -> Result<bool, DomainError> {
+    state.manage_playlists.is_saved(playlist_id).await
+}
+
+#[tauri::command]
+pub fn update_discord_rpc(
+    state: State<'_, AppState>,
+    payload: crate::infrastructure::DiscordActivityPayload,
+) {
+    state.discord_rpc.update_activity(payload);
+}
+
+#[tauri::command]
+pub fn clear_discord_rpc(
+    state: State<'_, AppState>,
+) {
+    state.discord_rpc.clear_activity();
+}
+
+#[tauri::command]
+pub fn set_discord_rpc_enabled(
+    state: State<'_, AppState>,
+    enabled: bool,
+) {
+    state.discord_rpc.set_enabled(enabled);
+}
+
+#[tauri::command]
+pub fn set_discord_client_id(
+    state: State<'_, AppState>,
+    client_id: Option<String>,
+) {
+    state.discord_rpc.set_client_id(client_id);
 }

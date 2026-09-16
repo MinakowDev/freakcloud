@@ -24,12 +24,10 @@
   left: 0;
   top: 0;
   bottom: 0;
-  background: linear-gradient(
-    0deg,
-    rgba(0, 0, 0, 0) 0%,
-    rgba(39, 39, 42, 1) 50%,
-    rgba(0, 0, 0, 0) 100%
-  );
+  background: linear-gradient(0deg,
+      rgba(0, 0, 0, 0) 0%,
+      rgba(39, 39, 42, 1) 50%,
+      rgba(0, 0, 0, 0) 100%);
   width: 1px;
 }
 
@@ -38,16 +36,14 @@
   height: calc(100% / var(--total-radio));
   width: 100%;
   opacity: 0;
-  background: linear-gradient(
-    0deg,
-    rgba(0, 0, 0, 0) 0%,
-    var(--main-color) 50%,
-    rgba(0, 0, 0, 0) 100%
-  );
+  background: linear-gradient(0deg,
+      rgba(0, 0, 0, 0) 0%,
+      var(--main-color) 50%,
+      rgba(0, 0, 0, 0) 100%);
   transition: opacity 0.3s ease, transform 0.5s cubic-bezier(0.37, 1.95, 0.66, 0.56);
 }
 
-.sidebar-radio-container input:checked ~ .glider-container .glider {
+.sidebar-radio-container input:checked~.glider-container .glider {
   opacity: 1;
 }
 
@@ -69,11 +65,9 @@
   left: 0;
   height: 100%;
   width: 160px;
-  background: linear-gradient(
-    90deg,
-    var(--main-color-opacity) 0%,
-    rgba(0, 0, 0, 0) 100%
-  );
+  background: linear-gradient(90deg,
+      var(--main-color-opacity) 0%,
+      rgba(0, 0, 0, 0) 100%);
   pointer-events: none;
 }
 
@@ -95,19 +89,19 @@
   color: #ffffff;
 }
 
-.sidebar-radio-container input:checked + label {
+.sidebar-radio-container input:checked+label {
   color: var(--main-color);
   font-weight: 600;
 }
 
-.sidebar-radio-container input:nth-of-type(1):checked ~ .glider-container .glider {
+.sidebar-radio-container input:nth-of-type(1):checked~.glider-container .glider {
   transform: translateY(0);
 }
 
-.sidebar-radio-container input:nth-of-type(2):checked ~ .glider-container .glider {
+.sidebar-radio-container input:nth-of-type(2):checked~.glider-container .glider {
   transform: translateY(100%);
 }
 
-.sidebar-radio-container input:nth-of-type(3):checked ~ .glider-container .glider {
+.sidebar-radio-container input:nth-of-type(3):checked~.glider-container .glider {
   transform: translateY(200%);
 }

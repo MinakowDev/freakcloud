@@ -1,46 +1,70 @@
-import React from 'react';
+import React, { useCallback } from 'react';
 import { useTranslation } from '../../../shared/lib/i18n';
 import { useCache } from '../../../entities/track/model/cache-context';
 import { TrackTable } from '../../../widgets/track-list/ui/TrackTable';
 import { WaveDeck } from '../../../widgets/wave-deck/ui/WaveDeck';
+import { DynamicGreeting } from '../../../widgets/greeting/ui/DynamicGreeting';
+import { TasteVibes } from '../../../widgets/taste-vibes/ui/TasteVibes';
+import { TasteProfileCard } from '../../../widgets/taste-profile/ui/TasteProfileCard';
+import { SupportBanner } from '../../../widgets/support-banner/ui/SupportBanner';
 import type { PageView } from '../../../widgets/sidebar/ui/Sidebar';
 
 interface HomePageProps {
   onNavigate?: (page: PageView) => void;
+  onSelectQuery?: (query: string) => void;
 }
 
-export const HomePage: React.FC<HomePageProps> = () => {
+export const HomePage: React.FC<HomePageProps> = ({ onNavigate, onSelectQuery }) => {
   const { messages } = useTranslation();
   const { cachedTracks } = useCache();
 
+  const handleSelectVibe = useCallback((query: string) => {
+    if (onSelectQuery) {
+      onSelectQuery(query);
+    } else if (onNavigate) {
+      onNavigate('search');
+    }
+  }, [onSelectQuery, onNavigate]);
+
+  const handleOpenTasteGraph = useCallback(() => {
+    if (onNavigate) {
+      onNavigate('taste-graph');
+    }
+  }, [onNavigate]);
+
   return (
     <div className="flex flex-col gap-space-xl max-w-6xl w-full">
-      {/* 1. Greeting */}
-      <section className="animate-cascade flex flex-col gap-space-sm" style={{ animationDelay: '0ms' }}>
-        <h1 className="font-headline-md text-headline-md text-white tracking-tight">
-          {messages.home.greeting}
-        </h1>
-      </section>
+      {/* 1. Dynamic Greeting */}
+      <DynamicGreeting />
 
-      {/* 2. Personal Stream Deck */}
+      {/* 2. Taste Vibes chips */}
+      <TasteVibes onSelectVibe={handleSelectVibe} />
+
+      {/* 3. Personal Wave Deck */}
       <WaveDeck />
 
-      {/* 3. Recent or Cached Tracks Section */}
-      <section className="animate-cascade flex flex-col gap-space-sm" style={{ animationDelay: '100ms' }}>
-        <div className="flex items-center justify-between pb-space-xs">
-          <div className="flex items-center gap-space-xs">
-            <i className="ri-music-2-line text-zinc-400 text-[20px]"></i>
+      {/* 4. Two-column: Taste Profile + Recent Tracks */}
+      <div className="home-bottom-grid">
+        {/* Left: Taste Profile Card */}
+        <TasteProfileCard onOpenTasteGraph={handleOpenTasteGraph} />
+
+        {/* Right: Recent / Cached Tracks */}
+        <section className="animate-cascade flex flex-col gap-space-sm" style={{ animationDelay: '100ms' }}>
+          <div className="flex items-center gap-space-xs pb-space-xs">
+            <i className="ri-music-2-line text-zinc-400 text-[20px]" />
             <h2 className="font-headline-sm text-headline-sm text-white tracking-tight">
               {cachedTracks.length > 0 ? messages.library.offline_tab : messages.home.recent_tracks}
             </h2>
           </div>
-        </div>
+          <TrackTable
+            tracks={cachedTracks.slice(0, 10)}
+            emptyMessage={messages.home.empty_recent}
+          />
+        </section>
+      </div>
 
-        <TrackTable
-          tracks={cachedTracks.slice(0, 10)}
-          emptyMessage={messages.home.empty_recent}
-        />
-      </section>
+      {/* 5. GitHub Support Banner */}
+      <SupportBanner />
     </div>
   );
 };

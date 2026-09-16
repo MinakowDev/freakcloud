@@ -1,0 +1,123 @@
+.support-banner {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 16px 20px;
+  border-radius: 14px;
+  background: rgba(247, 228, 121, 0.05);
+  border: 1px solid rgba(247, 228, 121, 0.12);
+  backdrop-filter: blur(20px) saturate(140%);
+  -webkit-backdrop-filter: blur(20px) saturate(140%);
+  overflow: hidden;
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.2);
+}
+
+.support-banner__star-glow {
+  position: absolute;
+  top: -40px;
+  right: -40px;
+  width: 120px;
+  height: 120px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(247, 228, 121, 0.12) 0%, transparent 70%);
+  pointer-events: none;
+}
+
+.support-banner__body {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex: 1;
+  min-width: 0;
+}
+
+.support-banner__icon {
+  font-size: 24px;
+  flex-shrink: 0;
+  line-height: 1;
+  filter: drop-shadow(0 0 8px rgba(247, 228, 121, 0.4));
+}
+
+.support-banner__text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.support-banner__title {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: #f0e8a0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.support-banner__desc {
+  margin: 0;
+  font-size: 11px;
+  color: #7a7a50;
+  line-height: 1.5;
+}
+
+.support-banner__actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.support-banner__star-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  border-radius: 8px;
+  background: rgba(247, 228, 121, 0.12);
+  border: 1px solid rgba(247, 228, 121, 0.25);
+  color: #f7e479;
+  font-size: 12px;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  outline: none !important;
+  transition: all 0.18s ease;
+  white-space: nowrap;
+}
+
+.support-banner__star-btn:hover {
+  background: rgba(247, 228, 121, 0.2);
+  border-color: rgba(247, 228, 121, 0.4);
+  box-shadow: 0 0 20px rgba(247, 228, 121, 0.15);
+  transform: translateY(-1px);
+}
+
+.support-banner__star-btn:active {
+  transform: translateY(0);
+  box-shadow: none;
+}
+
+.support-banner__dismiss-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  background: transparent;
+  border: none;
+  color: #4a4a3a;
+  font-size: 16px;
+  cursor: pointer;
+  outline: none !important;
+  transition: color 0.15s ease, background 0.15s ease;
+}
+
+.support-banner__dismiss-btn:hover {
+  color: #8e8e70;
+  background: rgba(255, 255, 255, 0.05);
+}

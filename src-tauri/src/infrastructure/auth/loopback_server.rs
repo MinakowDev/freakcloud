@@ -61,7 +61,7 @@ pub async fn start_loopback_server(app: AppHandle) {
 <html>
 <head>
   <meta charset="utf-8">
-  <title>freackcloud</title>
+  <title>freakcloud</title>
   <style>
     body { background: #000000; color: #ffffff; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; }
     .box { text-align: center; background: #09090b; padding: 36px 48px; border-radius: 16px; border: 1px solid #27272a; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.7); max-width: 380px; }
@@ -72,7 +72,7 @@ pub async fn start_loopback_server(app: AppHandle) {
 <body>
   <div class="box">
     <h1>✓ Успешно!</h1>
-    <p>Авторизация передана в freackcloud. Можете закрыть эту вкладку.</p>
+    <p>Авторизация передана в freakcloud. Можете закрыть эту вкладку.</p>
     <script>setTimeout(function() { window.close(); }, 2500);</script>
   </div>
 </body>

@@ -1,6 +1,6 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "freackcloud",
+  "productName": "freakcloud",
   "version": "0.1.0",
   "identifier": "com.minakow.freakcloud",
   "build": {
@@ -13,20 +13,38 @@
     "withGlobalTauri": true,
     "windows": [
       {
-        "title": "freackcloud",
+        "title": "freakcloud",
         "label": "main",
         "width": 1100,
         "height": 720,
         "minWidth": 800,
         "minHeight": 550,
         "decorations": false
+      },
+      {
+        "title": "freakcloud-tray",
+        "label": "tray-widget",
+        "url": "/index.html?view=tray-widget",
+        "width": 340,
+        "height": 140,
+        "resizable": false,
+        "decorations": false,
+        "transparent": true,
+        "alwaysOnTop": true,
+        "visible": false,
+        "skipTaskbar": true,
+        "shadow": true
       }
     ],
     "security": {
       "csp": null,
       "assetProtocol": {
         "enable": true,
-        "scope": ["$CACHE/**", "$APPDATA/**", "**"]
+        "scope": [
+          "$CACHE/**",
+          "$APPDATA/**",
+          "**"
+        ]
       }
     }
   },

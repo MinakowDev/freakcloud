@@ -1,0 +1,402 @@
+.interactive-taste-graph {
+  position: relative;
+  width: 100%;
+  height: 310px;
+  background: #000000;
+  border: 1px solid #1a1a1a;
+  border-radius: 2px;
+  overflow: hidden;
+  user-select: none;
+  touch-action: none;
+  overscroll-behavior: contain;
+}
+
+.interactive-taste-graph canvas {
+  width: 100%;
+  height: 100%;
+  cursor: grab;
+  display: block;
+}
+
+.interactive-taste-graph canvas:active {
+  cursor: grabbing;
+}
+
+/* Industrial Toolbar */
+.itg-toolbar {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 2px;
+  background: #080808;
+  border: 1px solid #1a1a1a;
+  border-radius: 2px;
+  z-index: 20;
+}
+
+.itg-tool-btn {
+  width: 26px;
+  height: 26px;
+  border-radius: 2px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: #71717a;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.12s ease;
+  outline: none !important;
+}
+
+.itg-tool-btn:hover {
+  background: #141414;
+  color: #ffffff;
+}
+
+.itg-tool-btn--active {
+  background: #ffffff;
+  color: #000000 !important;
+}
+
+.itg-zoom-label {
+  font-size: 11px;
+  font-family: ui-monospace, SFMono-Regular, monospace;
+  color: #71717a;
+  padding: 0 6px;
+  min-width: 40px;
+  text-align: center;
+}
+
+/* Dark Neumorphic Rounded Inspector Modal */
+.itg-inspector {
+  position: absolute;
+  bottom: 10px;
+  left: 10px;
+  width: 280px;
+  max-height: 290px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  background: #0e0e11;
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  padding: 10px 12px;
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  box-shadow:
+    8px 8px 24px rgba(0, 0, 0, 0.9),
+    -4px -4px 16px rgba(255, 255, 255, 0.02),
+    inset 1px 1px 1px rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(12px);
+}
+
+.itg-inspector::-webkit-scrollbar {
+  width: 3px;
+}
+.itg-inspector::-webkit-scrollbar-thumb {
+  background: #27272a;
+  border-radius: 3px;
+}
+
+.itg-inspector__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.itg-inspector__badge {
+  font-family: ui-monospace, SFMono-Regular, monospace;
+  font-size: 9px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  color: #8e8e93;
+}
+
+.itg-inspector__title {
+  margin: 1px 0 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: #ffffff;
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 215px;
+}
+
+.itg-inspector__close {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  background: #141418;
+  color: #71717a;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  cursor: pointer;
+  box-shadow: 2px 2px 5px #050507, -2px -2px 5px #1c1c22;
+  transition: all 0.15s ease;
+  outline: none !important;
+}
+
+.itg-inspector__close:hover {
+  color: #ffffff;
+  background: #1b1b22;
+  box-shadow: 3px 3px 7px #000000, -2px -2px 7px #23232c;
+}
+
+.itg-inspector__close:active {
+  box-shadow: inset 1px 1px 3px #050507, inset -1px -1px 3px #1a1a22;
+}
+
+/* Sunken Neumorphic Stats Plate */
+.itg-inspector__stats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 4px;
+  padding: 4px 6px;
+  background: #08080a;
+  border-radius: 10px;
+  box-shadow: inset 2px 2px 4px #030304, inset -2px -2px 4px #141418;
+  border: 1px solid rgba(255, 255, 255, 0.02);
+}
+
+.itg-inspector__stat-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+}
+
+.itg-inspector__stat-value {
+  font-size: 12px;
+  font-weight: 700;
+  color: #ffffff;
+  font-family: ui-monospace, SFMono-Regular, monospace;
+}
+
+.itg-inspector__stat-label {
+  font-size: 8px;
+  color: #71717a;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  font-family: ui-monospace, SFMono-Regular, monospace;
+}
+
+/* Listened Tracks in Inspector */
+.itg-inspector__tracks {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 4px 6px;
+  background: #08080a;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.03);
+  box-shadow: inset 1px 1px 3px #030304, inset -1px -1px 3px #121216;
+}
+
+.itg-inspector__section-label {
+  font-family: ui-monospace, SFMono-Regular, monospace;
+  font-size: 8px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  color: #71717a;
+  padding-left: 2px;
+}
+
+.itg-inspector__track-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.itg-track-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 4px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.12s ease;
+  user-select: none;
+}
+
+.itg-track-row:hover {
+  background: rgba(255, 255, 255, 0.07);
+}
+
+.itg-track-row__cover {
+  width: 22px;
+  height: 22px;
+  border-radius: 4px;
+  overflow: hidden;
+  position: relative;
+  flex-shrink: 0;
+  background: #141418;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.itg-track-row__img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.itg-track-row__icon {
+  font-size: 11px;
+  color: #71717a;
+}
+
+.itg-track-row__play-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.65);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: opacity 0.12s ease;
+  color: #ffffff;
+  font-size: 10px;
+}
+
+.itg-track-row:hover .itg-track-row__play-overlay {
+  opacity: 1;
+}
+
+.itg-track-row__info {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  flex: 1;
+}
+
+.itg-track-row__title {
+  font-size: 11px;
+  font-weight: 500;
+  color: #ffffff;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 1.2;
+}
+
+.itg-track-row__artist {
+  font-size: 9px;
+  color: #71717a;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-family: ui-monospace, SFMono-Regular, monospace;
+}
+
+.itg-track-row__liked {
+  font-size: 10px;
+  color: #ef4444;
+  flex-shrink: 0;
+}
+
+/* Tactile Neumorphic Actions Row */
+.itg-inspector__actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 1px;
+}
+
+.itg-btn-neu {
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  background: #141418;
+  color: #e4e4e7;
+  border-radius: 10px;
+  box-shadow: 3px 3px 7px #050507, -2px -2px 6px #1c1c22;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  outline: none !important;
+}
+
+.itg-btn-neu:hover {
+  color: #ffffff;
+  background: #1a1a20;
+  box-shadow: 4px 4px 9px #030305, -3px -3px 8px #22222a;
+}
+
+.itg-btn-neu:active {
+  box-shadow: inset 2px 2px 4px #040406, inset -2px -2px 4px #1a1a22;
+  transform: scale(0.97);
+}
+
+.itg-btn-neu--wave {
+  flex: 1;
+  height: 30px;
+  padding: 0 10px;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: #ffffff;
+  background: #17171d;
+}
+
+.itg-btn-neu--wave:hover {
+  background: #202028;
+}
+
+.itg-btn-neu--icon {
+  width: 30px;
+  height: 30px;
+  font-size: 14px;
+  color: #a1a1aa;
+}
+
+.itg-btn-neu--danger:hover {
+  color: #f87171;
+  border-color: rgba(239, 68, 68, 0.25);
+}
+
+/* Minimal Legend */
+.itg-legend-overlay {
+  position: absolute;
+  bottom: 10px;
+  right: 10px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 4px 10px;
+  background: #080808;
+  border: 1px solid #1a1a1a;
+  border-radius: 2px;
+  font-size: 10px;
+  font-family: ui-monospace, SFMono-Regular, monospace;
+  color: #52525b;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  z-index: 10;
+  pointer-events: none;
+}
+
+.itg-legend-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  display: inline-block;
+  margin-right: 4px;
+}

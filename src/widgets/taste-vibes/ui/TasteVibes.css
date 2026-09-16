@@ -1,0 +1,55 @@
+.taste-vibes {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.taste-vibes__label {
+  font-size: 10px;
+  font-weight: 600;
+  color: #5a5a5f;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+}
+
+.taste-vibes__scroll {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.taste-vibes__chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 14px;
+  border-radius: 9999px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  color: #a0a0a8;
+  font-size: 12px;
+  font-weight: 500;
+  font-family: inherit;
+  cursor: pointer;
+  transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+  outline: none !important;
+  white-space: nowrap;
+  user-select: none;
+}
+
+.taste-vibes__chip:hover {
+  background: rgba(247, 228, 121, 0.1);
+  border-color: rgba(247, 228, 121, 0.25);
+  color: #f7e479;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 16px rgba(247, 228, 121, 0.08);
+}
+
+.taste-vibes__chip:active {
+  transform: translateY(0);
+  box-shadow: none;
+}
+
+.taste-vibes__chip-icon {
+  font-size: 14px;
+}

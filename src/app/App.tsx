@@ -2,7 +2,8 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { SessionProvider, useSession } from '../entities/session/model/session-context';
 import { CacheProvider } from '../entities/track/model/cache-context';
 import { LikesProvider } from '../entities/track/model/likes-context';
-import { PlayerProvider } from '../entities/player/model/player-context';
+import { PlayerProvider } from '../entities/player/model/PlayerProvider';
+import { PlaylistProvider } from '../entities/playlist/model/playlist-context';
 import { Sidebar, type PageView } from '../widgets/sidebar/ui/Sidebar';
 import { Header } from '../widgets/header/ui/Header';
 import { PlayerBar } from '../widgets/player-bar/ui/PlayerBar';
@@ -11,6 +12,7 @@ import { SearchPage } from '../pages/search/ui/SearchPage';
 import { LibraryPage } from '../pages/library/ui/LibraryPage';
 import { SettingsPage } from '../pages/settings/ui/SettingsPage';
 import { LoginPage } from '../pages/login/ui/LoginPage';
+import { TasteGraphPage } from '../pages/taste-graph/ui/TasteGraphPage';
 import { QueueAside } from '../widgets/queue-aside/ui/QueueAside';
 import { LoginModal } from '../widgets/auth/ui/LoginModal';
 import { tauriApi } from '../shared/api/tauri-client';
@@ -91,7 +93,7 @@ export const AppContent: React.FC = () => {
     return (
       <div className="h-screen w-screen bg-black flex items-center justify-center select-none">
         <div className="w-16 h-16 animate-pulse">
-          <img src="/logo.png" alt="FreackCloud" className="w-full h-full object-contain" />
+          <img src="/logo.png" alt="freakcloud" className="w-full h-full object-contain" />
         </div>
       </div>
     );
@@ -127,15 +129,29 @@ export const AppContent: React.FC = () => {
           />
 
           <main className="flex-1 overflow-y-auto overflow-x-hidden p-space-lg flex flex-col items-center">
-            {currentPage === 'home' && <HomePage onNavigate={navigateTo} />}
+            {currentPage === 'home' && (
+              <HomePage
+                onNavigate={navigateTo}
+                onSelectQuery={(q) => {
+                  setSearchQuery(q);
+                  navigateTo('search');
+                  performSearch(q);
+                }}
+              />
+            )}
             {currentPage === 'search' && (
               <SearchPage
                 searchQuery={searchQuery}
                 searchResults={searchResults}
                 isSearching={isSearching}
+                onSelectQuery={(q) => {
+                  setSearchQuery(q);
+                  performSearch(q);
+                }}
               />
             )}
             {currentPage === 'library' && <LibraryPage />}
+            {currentPage === 'taste-graph' && <TasteGraphPage onNavigate={navigateTo} />}
             {currentPage === 'settings' && <SettingsPage />}
           </main>
         </div>
@@ -158,9 +174,11 @@ export const App: React.FC = () => {
     <SessionProvider>
       <CacheProvider>
         <LikesProvider>
-          <PlayerProvider>
-            <AppContent />
-          </PlayerProvider>
+          <PlaylistProvider>
+            <PlayerProvider>
+              <AppContent />
+            </PlayerProvider>
+          </PlaylistProvider>
         </LikesProvider>
       </CacheProvider>
     </SessionProvider>

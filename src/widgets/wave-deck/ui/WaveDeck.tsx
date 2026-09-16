@@ -1,10 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { usePlayer } from '../../../entities/player/model/player-context';
 import { useCache } from '../../../entities/track/model/cache-context';
-import { useSession } from '../../../entities/session/model/session-context';
+import { useLikes } from '../../../entities/track/model/likes-context';
 import { useTranslation } from '../../../shared/lib/i18n';
-import { tauriApi } from '../../../shared/api/tauri-client';
-import type { Track } from '../../../entities/track/model/types';
 import { generatePersonalWave } from '../../../entities/track/lib/wave-algorithm';
 import './WaveDeck.css';
 
@@ -12,21 +10,9 @@ export const WaveDeck: React.FC = () => {
   const { messages } = useTranslation();
   const { isPlaying, playTrack, togglePlayPause, isWaveMode, setWaveMode } = usePlayer();
   const { cachedTracks } = useCache();
-  const { session } = useSession();
+  const { likedTracks, soundCloudTracks } = useLikes();
 
   const [isLoadingWave, setIsLoadingWave] = useState(false);
-  const [userLikes, setUserLikes] = useState<Track[]>([]);
-
-  // Load user likes once to fuel the taste profile
-  useEffect(() => {
-    if (session.is_authenticated) {
-      tauriApi.getMyLikes(50).then((likes) => {
-        setUserLikes(likes);
-      }).catch((err) => {
-        console.warn('[WaveDeck] Failed to fetch likes for taste profile:', err);
-      });
-    }
-  }, [session.is_authenticated]);
 
   const handleToggleWave = async () => {
     // If wave is already active, clicking toggles playback
@@ -37,7 +23,7 @@ export const WaveDeck: React.FC = () => {
 
     try {
       setIsLoadingWave(true);
-      const waveTracks = await generatePersonalWave('discover', userLikes, cachedTracks);
+      const waveTracks = await generatePersonalWave('discover', likedTracks, cachedTracks, soundCloudTracks);
 
       if (waveTracks.length > 0) {
         await playTrack(waveTracks[0], waveTracks);

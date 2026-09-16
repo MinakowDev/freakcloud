@@ -2,13 +2,22 @@ use async_trait::async_trait;
 
 use crate::domain::{
     errors::DomainError,
-    models::{Track, UserProfile},
+    models::{Playlist, Track, UserProfile},
 };
 
 #[async_trait]
 pub trait SoundCloudGateway: Send + Sync {
     /// Поиск треков по запросу
     async fn search_tracks(&self, query: &str, limit: u32, offset: u32) -> Result<Vec<Track>, DomainError>;
+
+    /// Поиск плейлистов (исключая альбомы) по запросу
+    async fn search_playlists(&self, query: &str, limit: u32, offset: u32) -> Result<Vec<Playlist>, DomainError>;
+
+    /// Получение информации о плейлисте по его ID
+    async fn get_playlist(&self, playlist_id: u64) -> Result<Playlist, DomainError>;
+
+    /// Получение всех треков плейлиста
+    async fn get_playlist_tracks(&self, playlist_id: u64) -> Result<Vec<Track>, DomainError>;
 
     /// Получение информации о треке по его ID
     async fn get_track(&self, track_id: u64) -> Result<Track, DomainError>;

@@ -2,7 +2,7 @@ import React from 'react';
 import { useTranslation } from '../../../shared/lib/i18n';
 import { useSession } from '../../../entities/session/model/session-context';
 import { WindowControls } from '../../window-controls/ui/WindowControls';
-import { WaveSearchInput } from './WaveSearchInput';
+import { StudioSearchInput } from './StudioSearchInput';
 
 interface HeaderProps {
   searchQuery: string;
@@ -26,13 +26,13 @@ export const Header: React.FC<HeaderProps> = ({
       {/* Col 1 (Left): Drag region / spacer */}
       <div className="flex items-center h-full" data-tauri-drag-region />
 
-      {/* Col 2 (Center): Centered Wave Search Input */}
+      {/* Col 2 (Center): Centered Studio Search Input */}
       <div className="flex items-center justify-center">
-        <WaveSearchInput
+        <StudioSearchInput
           value={searchQuery}
           onChange={onSearchChange}
           onSubmit={onSearchSubmit}
-          className="w-72 sm:w-96"
+          className="w-72 sm:w-[420px]"
         />
       </div>
 

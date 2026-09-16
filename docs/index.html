@@ -1,17 +1,21 @@
 <!DOCTYPE html>
 <html lang="ru">
+
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>freackcloud — SoundCloud десктоп плеер</title>
-  <meta name="description" content="Быстрый и минималистичный десктопный плеер для SoundCloud. Бесконечная персональная волна, локальный кэш и плавная смена треков." />
+  <title>freakcloud — SoundCloud десктоп плеер</title>
+  <meta name="description"
+    content="Быстрый и минималистичный десктопный плеер для SoundCloud. Бесконечная персональная волна, локальный кэш и плавная смена треков." />
   <meta name="theme-color" content="#000000" />
   <link rel="icon" type="image/png" href="logo.png" />
 
   <!-- Google Fonts: Plus Jakarta Sans, Outfit, JetBrains Mono -->
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=Outfit:wght@500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=Outfit:wght@500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap"
+    rel="stylesheet" />
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/remixicon@4.2.0/fonts/remixicon.css" />
 
   <style>
@@ -30,7 +34,9 @@
     }
 
     /* Строгий запрет на скругления и любые обводки */
-    *, *::before, *::after {
+    *,
+    *::before,
+    *::after {
       box-sizing: border-box;
       margin: 0;
       padding: 0;
@@ -72,8 +78,15 @@
     }
 
     @keyframes ambientPulse {
-      0% { transform: translateX(-50%) scale(1); opacity: 0.7; }
-      100% { transform: translateX(-49%) scale(1.08); opacity: 1; }
+      0% {
+        transform: translateX(-50%) scale(1);
+        opacity: 0.7;
+      }
+
+      100% {
+        transform: translateX(-49%) scale(1.08);
+        opacity: 1;
+      }
     }
 
     .container {
@@ -148,6 +161,7 @@
         opacity: 0;
         transform: translateY(14px);
       }
+
       to {
         opacity: 1;
         transform: translateY(0);
@@ -388,6 +402,7 @@
     }
   </style>
 </head>
+
 <body>
 
   <!-- Мягкое фоновое свечение (Blur) -->
@@ -398,8 +413,8 @@
     <div class="container">
       <div class="nav-inner">
         <a href="#" class="brand">
-          <img src="logo.png" alt="freackcloud logo" class="brand-logo" />
-          <span class="brand-title">freackcloud</span>
+          <img src="logo.png" alt="freakcloud logo" class="brand-logo" />
+          <span class="brand-title">freakcloud</span>
         </a>
 
         <nav class="nav-links">
@@ -418,7 +433,8 @@
         Слушайте SoundCloud.<br><span>Без тормозов и рекламы.</span>
       </h1>
       <p class="hero-desc">
-        Быстрый и чистый плеер на рабочий стол. Не жрет память в отличие от вкладок браузера, моментально стартует, плавно переключает треки и умеет играть музыку офлайн.
+        Быстрый и чистый плеер на рабочий стол. Не жрет память в отличие от вкладок браузера, моментально стартует,
+        плавно переключает треки и умеет играть музыку офлайн.
       </p>
       <div class="hero-actions">
         <a href="#download" class="btn-main">
@@ -443,7 +459,8 @@
             Ест ~38 МБ памяти
           </h3>
           <p class="feature-desc">
-            Не грузит систему и игры. Никаких тяжелых браузеров в фоне — плеер открывается мгновенно и работает бесшумно.
+            Не грузит систему и игры. Никаких тяжелых браузеров в фоне — плеер открывается мгновенно и работает
+            бесшумно.
           </p>
         </div>
 
@@ -453,7 +470,8 @@
             Бесконечный поток
           </h3>
           <p class="feature-desc">
-            Умная волна SoundCloud Stations. Музыка естественно перетекает из трека в трек по реальным вкусам слушателей.
+            Умная волна SoundCloud Stations. Музыка естественно перетекает из трека в трек по реальным вкусам
+            слушателей.
           </p>
         </div>
 
@@ -463,7 +481,8 @@
             Умный подбор под вас
           </h3>
           <p class="feature-desc">
-            Плеер запоминает, что вы слушаете до конца, и больше предлагает похожего. Частые скипы убирают трек из выдачи.
+            Плеер запоминает, что вы слушаете до конца, и больше предлагает похожего. Частые скипы убирают трек из
+            выдачи.
           </p>
         </div>
 
@@ -505,7 +524,7 @@
 
       <div class="download-box">
         <div class="download-info">
-          <h3>freackcloud для Windows</h3>
+          <h3>freakcloud для Windows</h3>
           <p>Готовые сборки и обновления на GitHub Releases</p>
         </div>
         <div>
@@ -523,7 +542,8 @@
 
       <div class="about-box">
         <p>
-          <strong>freackcloud</strong> — бесплатный плеер с открытым исходным кодом. Он создан для тех, кто слушает SoundCloud каждый день, но устал от тяжелых вкладок браузера, пожирающих гигабайты оперативки.
+          <strong>freakcloud</strong> — бесплатный плеер с открытым исходным кодом. Он создан для тех, кто слушает
+          SoundCloud каждый день, но устал от тяжелых вкладок браузера, пожирающих гигабайты оперативки.
         </p>
         <p>
           Все ваши лайки, история прослушиваний и настройки хранятся только у вас на компьютере.
@@ -540,7 +560,7 @@
             Понравился плеер?
           </h3>
           <p class="support-desc">
-            Поставьте звездочку на GitHub — это помогает проекту развиваться и вдохновляет делать freackcloud еще лучше.
+            Поставьте звездочку на GitHub — это помогает проекту развиваться и вдохновляет делать freakcloud еще лучше.
           </p>
         </div>
         <div>
@@ -557,10 +577,11 @@
   <footer>
     <div class="container">
       <div class="footer-text">
-        freackcloud • MIT License
+        freakcloud • MIT License
       </div>
     </div>
   </footer>
 
 </body>
+
 </html>

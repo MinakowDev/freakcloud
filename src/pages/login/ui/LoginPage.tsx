@@ -10,7 +10,7 @@ interface LoginPageProps {
   onGuestContinue?: () => void;
 }
 
-const EXTENSION_PATH = 'd:\\Sys\\Dev\\freackcloud\\extension';
+const EXTENSION_PATH = 'd:\\Sys\\Dev\\freackcloud\\freakcloud-extension';
 
 export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess, onGuestContinue }) => {
   const { session, loginWithToken, isLoading } = useSession();
@@ -84,7 +84,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess, onGuestCon
         <div className={`login-logo-wrapper ${isSuccess ? 'logo-expanded' : ''}`}>
           <img
             src="/logo.png"
-            alt="FreackCloud Logo"
+            alt="freakcloud Logo"
             className="login-logo-img"
           />
         </div>

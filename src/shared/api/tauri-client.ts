@@ -1,6 +1,7 @@
 import { invoke, convertFileSrc } from '@tauri-apps/api/core';
 import type { AudioSource, CacheStats, Track } from '../../entities/track/model/types';
 import type { Session } from '../../entities/session/model/types';
+import type { Playlist } from '../../entities/playlist/model/types';
 
 export const isTauri = (): boolean => {
   if (typeof window === 'undefined') return false;
@@ -37,6 +38,30 @@ export const tauriApi = {
 
   searchTracks: async (query: string, limit = 30, offset = 0): Promise<Track[]> => {
     return safeInvoke<Track[]>('search_tracks', { query, limit, offset }, []);
+  },
+
+  searchPlaylists: async (query: string, limit = 20, offset = 0): Promise<Playlist[]> => {
+    return safeInvoke<Playlist[]>('search_playlists', { query, limit, offset }, []);
+  },
+
+  getPlaylistDetails: async (playlistId: number): Promise<Playlist> => {
+    return safeInvoke<Playlist>('get_playlist_details', { playlistId });
+  },
+
+  getSavedPlaylists: async (): Promise<Playlist[]> => {
+    return safeInvoke<Playlist[]>('get_saved_playlists', {}, []);
+  },
+
+  savePlaylist: async (playlist: Playlist): Promise<void> => {
+    return safeInvoke<void>('save_playlist', { playlist });
+  },
+
+  removeSavedPlaylist: async (playlistId: number): Promise<void> => {
+    return safeInvoke<void>('remove_saved_playlist', { playlistId });
+  },
+
+  isPlaylistSaved: async (playlistId: number): Promise<boolean> => {
+    return safeInvoke<boolean>('is_playlist_saved', { playlistId }, false);
   },
 
   getTrackStream: async (trackId: number): Promise<AudioSource> => {
@@ -139,6 +164,26 @@ export const tauriApi = {
     window.open(url, '_blank');
   },
 
+  showMainWindow: async (): Promise<void> => {
+    return safeInvoke<void>('show_main_window', {});
+  },
+
+  updateDiscordRpc: async (payload: DiscordRpcPayload): Promise<void> => {
+    return safeInvoke<void>('update_discord_rpc', { payload });
+  },
+
+  clearDiscordRpc: async (): Promise<void> => {
+    return safeInvoke<void>('clear_discord_rpc');
+  },
+
+  setDiscordRpcEnabled: async (enabled: boolean): Promise<void> => {
+    return safeInvoke<void>('set_discord_rpc_enabled', { enabled });
+  },
+
+  setDiscordClientId: async (clientId?: string): Promise<void> => {
+    return safeInvoke<void>('set_discord_client_id', { clientId });
+  },
+
   resolveAudioUrl: (source: AudioSource): string => {
     if (source.is_local && source.file_path) {
       if (isTauri()) {
@@ -153,3 +198,13 @@ export const tauriApi = {
     return source.url;
   },
 };
+
+export interface DiscordRpcPayload {
+  title: string;
+  artist: string;
+  artwork_url?: string;
+  permalink_url?: string;
+  is_playing: boolean;
+  current_time_sec: number;
+  duration_sec: number;
+}

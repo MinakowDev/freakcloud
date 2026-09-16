@@ -22,7 +22,7 @@ impl FileSessionStorage {
             .or_else(dirs::data_dir)
             .ok_or_else(|| DomainError::Storage("Could not locate user configuration directory".to_string()))?;
         
-        let app_dir = base_dir.join("freackcloud");
+        let app_dir = base_dir.join("freakcloud");
         Ok(app_dir.join("session.json"))
     }
 

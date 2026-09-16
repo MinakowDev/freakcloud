@@ -1,4 +1,4 @@
-/* LoginPage.css - Premium animated auth landing for FreackCloud */
+/* LoginPage.css - Premium animated auth landing for freakcloud */
 
 .login-page-container {
   min-height: 100vh;
@@ -145,7 +145,7 @@
   transform: translateY(0);
 }
 
-.btn-freackcloud {
+.btn-freakcloud {
   background: #ffffff;
   color: #000000;
   font-weight: 600;
@@ -162,13 +162,13 @@
   border: none;
 }
 
-.btn-freackcloud:hover {
+.btn-freakcloud:hover {
   background: #f4f4f5;
   transform: translateY(-1px);
   box-shadow: 0 6px 20px rgba(255, 255, 255, 0.25);
 }
 
-.btn-freackcloud:active {
+.btn-freakcloud:active {
   transform: translateY(0);
 }
 
@@ -178,6 +178,7 @@
     opacity: 0;
     transform: translateY(24px) scale(0.97);
   }
+
   100% {
     opacity: 1;
     transform: translateY(0) scale(1);

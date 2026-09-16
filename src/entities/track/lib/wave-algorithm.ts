@@ -1,6 +1,12 @@
 import type { Track } from '../model/types';
 import { tauriApi } from '../../../shared/api/tauri-client';
-import { getTopTasteSeeds, getRecentPlayedIds, scoreTrackAffinity } from './taste-graph';
+import {
+  getTopTasteSeeds,
+  getRecentPlayedIds,
+  scoreTrackAffinity,
+  extractGenresFromTrack,
+  isBlacklisted,
+} from './taste-graph';
 
 export type WaveVibe = 'discover' | 'familiar' | 'energetic' | 'calm';
 
@@ -10,81 +16,51 @@ interface TasteProfile {
   knownTrackIds: Set<number>;
 }
 
-// Extract genres, moods and stylistic keywords from track title & genre
-const MICRO_GENRE_KEYWORDS = [
-  'phonk',
-  'drift',
-  'wave',
-  'synthwave',
-  'retrowave',
-  'ambient',
-  'lofi',
-  'chill',
-  'downtempo',
-  'dnb',
-  'drum and bass',
-  'breakcore',
-  'breakbeat',
-  'witch house',
-  'techno',
-  'deep house',
-  'house',
-  'hyperpop',
-  'trap',
-  'rap',
-  'hip hop',
-  'experimental',
-  'electro',
-  'future bass',
-  'cyberpunk',
-];
-
 /**
  * Builds a weighted taste profile from the user's recent likes and cached tracks.
  * Applies time-decay weighting so recently liked tracks have stronger influence.
  */
-export function buildTasteProfile(likes: Track[], cached: Track[]): TasteProfile {
+export function buildTasteProfile(
+  likes: Track[],
+  cached: Track[],
+  soundCloudTracks: Track[] = []
+): TasteProfile {
   const artistWeights = new Map<string, number>();
   const genreWeights = new Map<string, number>();
   const knownTrackIds = new Set<number>();
 
-  const pool = [...likes, ...cached];
-
-  pool.forEach((track, index) => {
+  const ingest = (track: Track, weightMultiplier: number, index: number) => {
     knownTrackIds.add(track.id);
+    const decayWeight = Math.max(0.35, Math.exp(-0.035 * index)) * weightMultiplier;
 
-    // Time-decay: recent tracks (index 0..10) get weight ~1.0, older taper to ~0.35
-    const decayWeight = Math.max(0.35, Math.exp(-0.035 * index));
-
-    // Weight artist
     if (track.artist && track.artist.trim()) {
       const cleanArtist = track.artist.trim();
-      artistWeights.set(cleanArtist, (artistWeights.get(cleanArtist) || 0) + decayWeight * 2);
+      artistWeights.set(cleanArtist, (artistWeights.get(cleanArtist) || 0) + decayWeight * 2.5);
     }
 
-    // Weight metadata genre
-    if (track.genre && track.genre.trim()) {
-      const cleanGenre = track.genre.toLowerCase().trim();
-      genreWeights.set(cleanGenre, (genreWeights.get(cleanGenre) || 0) + decayWeight);
-    }
-
-    // Extract microgenre keywords from title & genre string
-    const fullText = `${track.title} ${track.genre || ''}`.toLowerCase();
-    MICRO_GENRE_KEYWORDS.forEach((kw) => {
-      if (fullText.includes(kw)) {
-        genreWeights.set(kw, (genreWeights.get(kw) || 0) + decayWeight * 1.5);
-      }
+    const genres = extractGenresFromTrack(track);
+    genres.forEach((g) => {
+      genreWeights.set(g, (genreWeights.get(g) || 0) + decayWeight * 2.0);
     });
-  });
+  };
+
+  // 1. Freakcloud internal likes: strongest intent (3.0x weight)
+  likes.forEach((track, index) => ingest(track, 3.0, index));
+
+  // 2. Cached / offline tracks: strong intent (1.5x weight)
+  cached.forEach((track, index) => ingest(track, 1.5, index));
+
+  // 3. SoundCloud library tracks: background affinity (1.0x weight)
+  soundCloudTracks.forEach((track, index) => ingest(track, 1.0, index));
 
   // Blend in behavioral Taste Graph (accumulated listens, skips, and likes)
   const tasteSeeds = getTopTasteSeeds(6, 6);
   tasteSeeds.artists.forEach((artist, idx) => {
-    const weight = 3.5 - idx * 0.35;
+    const weight = 4.0 - idx * 0.4;
     artistWeights.set(artist, (artistWeights.get(artist) || 0) + weight);
   });
   tasteSeeds.genres.forEach((genre, idx) => {
-    const weight = 2.5 - idx * 0.25;
+    const weight = 3.0 - idx * 0.3;
     genreWeights.set(genre, (genreWeights.get(genre) || 0) + weight);
   });
 
@@ -140,9 +116,10 @@ function smoothShuffle(tracks: Track[]): Track[] {
 export async function generatePersonalWave(
   vibe: WaveVibe,
   likes: Track[],
-  cached: Track[]
+  cached: Track[],
+  soundCloudTracks: Track[] = []
 ): Promise<Track[]> {
-  const profile = buildTasteProfile(likes, cached);
+  const profile = buildTasteProfile(likes, cached, soundCloudTracks);
   const userTracks = [...likes, ...cached];
 
   // 1. "Знакомое" (Familiar): Smart shuffle of user's personal likes & cache, plus related station tracks
@@ -194,7 +171,11 @@ export async function generatePersonalWave(
     batches.forEach((b) => {
       if (b.status === 'fulfilled' && Array.isArray(b.value)) {
         b.value.forEach((track) => {
-          if (!profile.knownTrackIds.has(track.id) && !seenIds.has(track.id)) {
+          if (
+            !profile.knownTrackIds.has(track.id) &&
+            !seenIds.has(track.id) &&
+            !isBlacklisted(track.artist, extractGenresFromTrack(track))
+          ) {
             seenIds.add(track.id);
             discoveredTracks.push(track);
           }
@@ -280,6 +261,7 @@ export interface WaveBatchOptions {
   vibe?: WaveVibe;
   likes: Track[];
   cached: Track[];
+  soundCloudTracks?: Track[];
   excludeIds?: Set<number>;
   batchSize?: number;
   currentTrackId?: number;
@@ -295,11 +277,12 @@ export async function generateWaveBatch(options: WaveBatchOptions): Promise<Trac
     vibe = 'discover',
     likes,
     cached,
+    soundCloudTracks = [],
     excludeIds = new Set(),
     batchSize = 12,
     currentTrackId,
   } = options;
-  const profile = buildTasteProfile(likes, cached);
+  const profile = buildTasteProfile(likes, cached, soundCloudTracks);
 
   // Combine all exclusions: currently queued + recently played in taste graph
   const allExcluded = new Set<number>([...excludeIds, ...profile.knownTrackIds]);
@@ -337,7 +320,11 @@ export async function generateWaveBatch(options: WaveBatchOptions): Promise<Trac
   results.forEach((res) => {
     if (res.status === 'fulfilled' && Array.isArray(res.value)) {
       res.value.forEach((t) => {
-        if (!allExcluded.has(t.id) && !seenInBatch.has(t.id)) {
+        if (
+          !allExcluded.has(t.id) &&
+          !seenInBatch.has(t.id) &&
+          !isBlacklisted(t.artist, extractGenresFromTrack(t))
+        ) {
           seenInBatch.add(t.id);
           candidates.push(t);
         }

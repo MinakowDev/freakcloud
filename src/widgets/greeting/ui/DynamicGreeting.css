@@ -1,0 +1,22 @@
+.dynamic-greeting {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.dynamic-greeting__title {
+  font-size: 26px;
+  font-weight: 700;
+  color: #ffffff;
+  letter-spacing: -0.5px;
+  line-height: 1.2;
+  margin: 0;
+}
+
+.dynamic-greeting__date {
+  font-size: 13px;
+  color: #6b6b70;
+  font-weight: 400;
+  margin: 0;
+  text-transform: capitalize;
+}
