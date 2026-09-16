@@ -5,8 +5,8 @@
 </p>
 
 <p align="center">
-  <strong>An ultra-lightweight, high-performance desktop music player for SoundCloud.</strong><br>
-  Ультралегковесный десктопный плеер для SoundCloud на Rust и Tauri v2.
+  <strong>The ultra-lightweight, high-performance desktop music player for SoundCloud.</strong><br>
+  Быстрый и невесомый десктопный плеер для SoundCloud на Rust и Tauri v2.
 </p>
 
 <p align="center">
@@ -27,9 +27,9 @@
 </p>
 
 > [!TIP]
-> **⚡ Quick SoundCloud Authorization / Быстрая авторизация в один клик**  
-> For instant zero-friction login without manual token extraction, install our companion browser extension:  
-> Для моментального и безопасного входа без ручного ввода токенов установите наше браузерное расширение:  
+> **⚡ Quick 1-Click Authorization / Авторизация в один клик**  
+> Connect your SoundCloud account instantly without manual token copying using our companion browser extension:  
+> Мгновенный вход в свой аккаунт SoundCloud без ручного ввода токенов через наше браузерное расширение:  
 > 👉 **[freakcloud-extension](https://github.com/MinakowDev/freakcloud-extension)**
 
 <p align="center">
@@ -40,51 +40,51 @@
 
 <h2 id="english">🇬🇧 English</h2>
 
-### ⚡ Ultra-Lightweight by Design
+### ⚡ Why freakcloud?
 
-Unlike bulky Chromium/Electron-based players that consume 500MB–1GB of RAM and put unnecessary load on your CPU, **freakcloud** is built with **Tauri v2** and a native **Rust** Tokio core:
+SoundCloud in a browser tab or Electron wrapper burns **500 MB – 1.5 GB of RAM**, lags background games, and drains battery life. 
 
-- **Minimal Memory Footprint**: Typically runs at ~30–50 MB of RAM.
-- **Zero Background Bloat**: Near-zero CPU usage when idling or playing audio.
-- **Instant Cold Start**: Native system webview rendering without bundling an entire browser engine.
+**freakcloud** re-engineers the experience with **Rust** and **Tauri v2**:
+- **Consumes ~40 MB RAM** — up to 20x lighter than web tabs or Electron apps.
+- **Near-zero CPU usage** — runs silently in the background without affecting your FPS or workflow.
+- **Instant cold start** — launches in milliseconds using your system's native webview.
 
-### ✨ Features
+---
 
-- **Personal Wave & Continuous Stream**: Infinite intelligent music flow powered by SoundCloud Track Stations blended with a client-side **Taste Graph** (exponential time-decay, completion bonuses, skip penalties, 3.0x local likes multiplier). Automatically replenishes in smooth batches of 10 tracks before reaching the end.
-- **Queue with Playback History**: Transparent queue with a dedicated **«Previously Played»** history section. 1-click instant jump to any previous song without losing queue progression.
-- **Interactive Taste Graph 2.0**: Studio CAD-style 2D physics simulation of your musical identity with zoom & pan, artist avatar nodes, micro-genre clustering, node boosting/damping, mute/blacklist controls, and an interactive stats inspector.
-- **6-Segment Media Library with Spring Glider**:
-  - **SoundCloud Likes**: Synchronized cloud library.
-  - **My Likes**: Instant offline-capable local favorited tracks.
-  - **Offline Cache**: Downloaded local files for zero-latency offline playback.
-  - **Albums**: Full album saves, discography views, and dedicated album modals.
-  - **Artists**: Library artist cards, top spotlight artists, track count & alphabetical sorting, and a deep-dive **Artist Card Modal** with top tracks and releases.
-  - **Custom Playlists**: Full-featured playlist creator and editor with **2x2 dynamic collage covers**, inline title editing, and integrated SoundCloud search to add tracks in one click.
-- **High-Performance Entity Caching**: In-memory LRU/TTL cache for artist profiles, albums, and playlists to eliminate redundant network calls and enable instant page transitions.
-- **Fluid & Adaptive Window Titlebar**: Custom frameless window header (`decorations: false`) with window controls (minimize, maximize, close) permanently pinned to the top-right corner, and a fluid search bar that dynamically scales from 140px to 440px.
-- **Drag-to-Scroll Sliders**: Smooth drag & pull horizontal scrolling on sliders and carousel sections.
-- **Spotify-like Crossfade**: Smooth logarithmic volume ramping and seamless transitions between tracks.
-- **Discord Rich Presence (RPC)**: Live status showcasing your currently playing track, artist, album art, and progress directly on Discord.
-- **System Tray Integration**: Background playback, tray mini-widget, and minimize-to-tray support.
+### ✨ Key Features
 
-### 🔑 One-Click SoundCloud Authorization
+- **🌊 Intelligent Infinite Stream**: Powered by SoundCloud Stations and tuned to your habits. The more you listen, the better the mix. Automatically queues upcoming tracks so the music never stops.
+- **💾 Offline Playback**: Cache favorite tracks directly to disk. Enjoy instant playback with zero buffering, even when your internet goes down.
+- **🔁 Queue with History**: Jump straight back to songs you listened to earlier with a single click, without breaking your current queue.
+- **📁 Playlists & Unified Library**: Create and edit custom playlists with instant SoundCloud track search, dynamic cover collages, and organized views for your likes, albums, and artists.
+- **🌐 Interactive Taste Graph**: Real-time 2D visualization of your music taste. Explore how your favorite artists and genres connect, boost or mute influences, and see your listening stats.
+- **🎧 Studio-Grade Crossfade**: Seamless transitions between tracks with smooth logarithmic volume ramping — no sudden silence or harsh cuts.
+- **🎮 Discord Rich Presence**: Show off what you are playing in Discord with live track titles, artist names, album art, and elapsed time.
+- **📌 System Tray Mini-Control**: Tuck freakcloud into your taskbar tray. Control playback anytime without keeping the main window open.
 
-SoundCloud employs DataDome WAF protections that block direct automated logins. To effortlessly authenticate without manual token extraction, use our open-source companion browser extension:
+---
+
+### 🔑 1-Click SoundCloud Authorization
+
+SoundCloud uses DataDome WAF protections that block automated desktop logins. To sign in effortlessly:
 
 👉 **[freakcloud Sync Extension (GitHub)](https://github.com/MinakowDev/freakcloud-extension)**
 
-1. Install the extension in Chrome, Edge, Brave, or any Chromium browser (via *Developer mode* → *Load unpacked*).
+1. Install the extension in any Chromium browser (Chrome, Edge, Brave).
 2. Log into [soundcloud.com](https://soundcloud.com).
-3. The extension automatically detects your session and transmits authorization locally to your desktop freakcloud app via `127.0.0.1:49281`.
+3. The extension securely transfers your session directly to the desktop app via `127.0.0.1:49281`.
 
-### 🛠 Tech Stack & Architecture
+---
 
-- **Frontend**: React 18, TypeScript, Vite, Vanilla CSS + Tailwind tokens, Remix Icon.
+### 🛠 Tech Stack
+
+- **Frontend**: React 18, TypeScript, Vite, Vanilla CSS tokens, Remix Icon.
 - **Backend**: Tauri v2, Rust, Tokio, Reqwest, Hyper (Loopback Audio Server), Discord RPC.
-- **Recommendation Engine**: Hybrid — SoundCloud Track Stations (Collaborative Filtering) + Client Taste Graph (Behavioral Heuristics with exponential time-decay).
-- **Architecture**: Modular Feature-Sliced Design (`entities`, `widgets`, `shared`, `pages`) and Rust Clean Architecture (`domain`, `infrastructure`, `interfaces`, `application`).
+- **Architecture**: Modular Feature-Sliced Design (`entities`, `widgets`, `shared`, `pages`) + Clean Architecture in Rust.
 
-### 🚀 Getting Started (Development & Build)
+---
+
+### 🚀 Getting Started
 
 #### Prerequisites
 - [Rust](https://www.rust-lang.org/) (latest stable)
@@ -98,10 +98,10 @@ cd freakcloud/freakcloud
 # Install frontend dependencies
 bun install
 
-# Run desktop app in development mode
+# Run in development mode
 bun tauri dev
 
-# Build release executable / installer
+# Build production executable (.exe / .msi)
 bun tauri build
 ```
 
@@ -109,54 +109,54 @@ bun tauri build
 
 <h2 id="russian">🇷🇺 Русский</h2>
 
-### ⚡ Ультралегковесная архитектура
+### ⚡ Почему freakcloud?
 
-В отличие от тяжелых плееров на базе Electron и прожорливых вкладок браузера, потребляющих сотни мегабайт ОЗУ, **freakcloud** построен на **Tauri v2** и скомпилированном ядре **Rust**:
+SoundCloud во вкладке браузера или Electron-обертке отъедает **от 500 МБ до 1.5 ГБ оперативной памяти**, нагружает систему в играх и тратит заряд батареи.
 
-- **Минимум оперативной памяти**: Потребляет всего ~30–50 МБ ОЗУ при активном воспроизведении.
-- **Нулевая фоновая нагрузка**: Менее 0.1% нагрузки на процессор во время простоя или воспроизведения.
-- **Мгновенный холодный старт**: Нативный системный Webview без встраивания тяжелого браузера Chromium.
+**freakcloud** создан на **Rust** и **Tauri v2** для максимальной скорости и легкости:
+- **Потребляет всего ~40 МБ ОЗУ** — в 15–20 раз легче браузера или Electron.
+- **Нулевая фоновая нагрузка** — музыка играет в фоне, не просаживая FPS в играх и не замедляя работу.
+- **Мгновенный старт** — плеер открывается за доли секунды благодаря нативному системному Webview.
 
-### ✨ Возможности
+---
 
-- **Бесконечный поток и персональная волна**: Умная персональная волна рекомендаций, объединяющая SoundCloud Track Stations и клиентский **Граф Вкусов** (экспоненциальное затухание по времени, бонусы за дослушивания, штрафы за скипы, 3.0x вес локальных лайков). Поток автоматически подгружает пачки по 10 треков при приближении к концу очереди.
-- **Очередь с историей прослушиваний**: Наглядная боковая панель очереди с отдельным разделом **«Ранее играли»**. Переход к любому прослушанному треку в один клик без сброса очереди и порядка воспроизведения.
-- **Интерактивный Граф Вкусов 2.0**: Живая физическая 2D-симуляция ваших музыкальных предпочтений с зумом и перемещением, **аватарками артистов внутри кружков графа**, кластеризацией микрожанров, бустом/снижением влияния, чёрным списком и четким инспектором метрик.
-- **6-секционная медиатека со стеклянным глайдером**:
-  - **SoundCloud**: Синхронизированные облачные лайки.
-  - **Мои лайки**: Мгновенные локальные лайки, доступные без интернета.
-  - **Сохраненки**: Офлайн-кэш для мгновенного прослушивания без задержек сети.
-  - **Альбомы**: Сохраненные релизы, просмотр трек-листа альбома и мгновенное добавление в очередь.
-  - **Артисты**: Интеллектуальные карточки исполнителей, блок лидеров прослушиваний, сортировка по трекам и алфавиту, а также **Карточка артиста** с топом треков и дискографией.
-  - **Плейлисты**: Полнофункциональный менеджер плейлистов с **динамическими коллажами обложек 2x2**, инлайн-редактированием названий и встроенным поиском для добавления треков из SoundCloud в один клик.
-- **Быстрое кэширование сущностей**: Клиентский LRU/TTL кэш для карточек артистов, альбомов и плейлистов, исключающий повторные запросы в сеть при навигации.
-- **Адаптивная шапка окна (Window Header)**: Кастомный безрамочный заголовок окна (`decorations: false`) с кнопками управления окном (свернуть, развернуть, закрыть), жестко зафиксированными в правом верхнем углу, и гибкой строкой поиска, адаптирующейся от 140px до 440px.
-- **Drag & Pull прокрутка слайдеров**: Удобное перетаскивание мышью и свайпы горизонтальных каруселей треков и альбомов.
-- **Студийный кроссфейд**: Плавное логарифмическое затухание и нарастание громкости между песнями без пауз и щелчков (как в Spotify).
-- **Интеграция с Discord RPC**: Отображение играющего трека, исполнителя, обложки и прогресса воспроизведения в статусе Discord.
-- **Интеграция с треем Windows**: Фоновое проигрывание, мини-виджет управления и сворачивание в трей в один клик.
+### ✨ Главные возможности
 
-### 🔑 Быстрая авторизация через браузер
+- **🌊 Умный бесконечный поток**: Персональная волна на основе станций SoundCloud, адаптированная под ваши вкусы. Музыка играет непрерывно и заранее подгружает свежие треки.
+- **💾 Офлайн-кэш**: Скачивайте любимые треки на локальный диск. Музыка играет мгновенно без сетевых буферизаций и доступна даже без интернета.
+- **🔁 Очередь с историей**: Удобный возврат к любой прослушанной песне в один клик без сброса текущего плейлиста.
+- **📁 Свои плейлисты и медиатека**: Создавайте собственные плейлисты с динамическими обложками, добавляйте треки через быстрый поиск по SoundCloud, управляйте лайками, альбомами и артистами в единой библиотеке.
+- **🌐 Интерактивный Граф вкусов**: Наглядная 2D-визуализация ваших музыкальных предпочтений. Узнайте, как связаны ваши любимые жанры и артисты, усиливайте или скрывайте исполнителей.
+- **🎧 Бесшовный кроссфейд**: Плавный переход между треками с мягким затуханием и нарастанием громкости (как в Spotify).
+- **🎮 Статус в Discord**: Автоматически показывает играющий трек, автора, обложку и таймлайн в вашем профиле Discord.
+- **📌 Управление из трея**: Сворачивайте плеер рядом с часами Windows и переключайте треки, не открывая главное окно.
 
-SoundCloud использует защиту DataDome WAF, блокирующую автоматический вход через сторонние приложения. Для моментальной и безопасной синхронизации используйте наше открытое браузерное расширение:
+---
+
+### 🔑 Вход в аккаунт в 1 клик
+
+SoundCloud защищён капчей DataDome, блокирующей прямой вход через сторонние приложения. Для моментальной авторизации:
 
 👉 **[Расширение freakcloud Sync (GitHub)](https://github.com/MinakowDev/freakcloud-extension)**
 
-1. Установите расширение в Chrome, Edge, Brave или Яндекс.Браузер (через «Режим разработчика» → «Загрузить распакованное»).
-2. Войдите на [soundcloud.com](https://soundcloud.com) в браузере.
-3. Расширение автоматически передаст токен в десктопный плеер freakcloud по локальному сокету `127.0.0.1:49281` без участия сторонних серверов.
+1. Установите расширение в Chrome, Edge, Brave или Яндекс.Браузер.
+2. Войдите на [soundcloud.com](https://soundcloud.com).
+3. Расширение безопасно передаст авторизацию напрямую в десктопное приложение через локальный порт `127.0.0.1:49281`.
 
-### 🛠 Стек технологий и архитектура
+---
 
-- **Фронтенд**: React 18, TypeScript, Vite, Vanilla CSS + Tailwind токены, Remix Icon.
+### 🛠 Стек технологий
+
+- **Фронтенд**: React 18, TypeScript, Vite, Vanilla CSS токены, Remix Icon.
 - **Бэкенд**: Tauri v2, Rust, Tokio, Reqwest, Hyper (Loopback Audio Server), Discord RPC.
-- **Рекомендации**: Гибридные — SoundCloud Track Stations (коллаборативная фильтрация) + клиентский Граф вкусов (поведенческая эвристика с экспоненциальным затуханием).
-- **Архитектура**: Feature-Sliced Design на фронтенде (`entities`, `widgets`, `shared`, `pages`) и Clean Architecture в ядре Rust (`domain`, `infrastructure`, `interfaces`, `application`).
+- **Архитектура**: Feature-Sliced Design на фронтенде + Clean Architecture в ядре Rust.
+
+---
 
 ### 🚀 Запуск и сборка
 
 #### Требования
-- [Rust](https://www.rust-lang.org/) (актуальная стабильная версия)
+- [Rust](https://www.rust-lang.org/) (актуальная версия)
 - [Bun](https://bun.sh/) или [Node.js](https://nodejs.org/) (18+)
 
 ```bash
@@ -164,13 +164,13 @@ SoundCloud использует защиту DataDome WAF, блокирующу�
 git clone https://github.com/MinakowDev/freakcloud.git
 cd freakcloud/freakcloud
 
-# Установка зависимостей фронтенда
+# Установка зависимостей
 bun install
 
-# Запуск приложения в режиме разработки
+# Запуск в режиме разработки
 bun tauri dev
 
-# Сборка финального установщика (.exe / .msi)
+# Сборка установщика для Windows (.exe / .msi)
 bun tauri build
 ```
 
@@ -178,4 +178,4 @@ bun tauri build
 
 ## 📄 License
 
-MIT License. Designed with precision for pure listening pleasure.
+MIT License. Designed for pure listening pleasure.
