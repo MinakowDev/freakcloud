@@ -6,9 +6,10 @@ import { useTranslation } from '../../../shared/lib/i18n';
 interface TrackTableProps {
   tracks: Track[];
   emptyMessage?: string;
+  onRemoveTrack?: (trackId: number) => void;
 }
 
-export const TrackTable: React.FC<TrackTableProps> = ({ tracks, emptyMessage }) => {
+export const TrackTable: React.FC<TrackTableProps> = ({ tracks, emptyMessage, onRemoveTrack }) => {
   const { messages } = useTranslation();
 
   if (tracks.length === 0) {
@@ -23,17 +24,23 @@ export const TrackTable: React.FC<TrackTableProps> = ({ tracks, emptyMessage }) 
   return (
     <div className="flex flex-col w-full">
       {/* Table Header matching TrackRow grid */}
-      <div className="grid grid-cols-[40px_1fr_96px_64px] items-center px-space-md py-space-xs font-label-sm text-label-sm text-zinc-500 uppercase tracking-wider border-b border-zinc-800/80">
+      <div className="grid grid-cols-[40px_1fr_auto_64px] items-center px-space-md py-space-xs font-label-sm text-label-sm text-zinc-500 uppercase tracking-wider border-b border-zinc-800/80 gap-2">
         <div className="text-center w-10">{messages.table.number}</div>
         <div className="min-w-0 pr-space-sm">{messages.table.title}</div>
-        <div className="text-center w-24">{messages.table.actions}</div>
+        <div className="text-center min-w-[124px]">{messages.table.actions}</div>
         <div className="text-right w-16">{messages.table.duration}</div>
       </div>
 
       {/* Table Rows */}
       <div className="flex flex-col gap-0.5 mt-1">
         {tracks.map((track, idx) => (
-          <TrackRow key={`${track.id}-${idx}`} track={track} index={idx} queueList={tracks} />
+          <TrackRow
+            key={`${track.id}-${idx}`}
+            track={track}
+            index={idx}
+            queueList={tracks}
+            onRemove={onRemoveTrack ? () => onRemoveTrack(track.id) : undefined}
+          />
         ))}
       </div>
     </div>

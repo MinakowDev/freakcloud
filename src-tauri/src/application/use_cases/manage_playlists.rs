@@ -26,6 +26,16 @@ impl ManagePlaylistsUseCase {
             .await
     }
 
+    pub async fn search_albums(&self, query: &str, limit: Option<u32>, offset: Option<u32>) -> Result<Vec<Playlist>, DomainError> {
+        let trimmed = query.trim();
+        if trimmed.is_empty() {
+            return Ok(Vec::new());
+        }
+        self.gateway
+            .search_albums(trimmed, limit.unwrap_or(20), offset.unwrap_or(0))
+            .await
+    }
+
     pub async fn get_saved(&self) -> Result<Vec<Playlist>, DomainError> {
         self.repo.get_all().await
     }

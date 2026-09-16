@@ -4,6 +4,7 @@ import { useCache } from '../../../entities/track/model/cache-context';
 import { useLikes } from '../../../entities/track/model/likes-context';
 import { formatTime } from '../../../entities/track/lib/format-time';
 import { useTranslation } from '../../../shared/lib/i18n';
+import { useArtist } from '../../../entities/artist/model/artist-context';
 
 export const PlayerBar: React.FC = () => {
   const {
@@ -33,6 +34,7 @@ export const PlayerBar: React.FC = () => {
   const { isCached, cacheTrack, removeCachedTrack, isDownloading } = useCache();
   const { isLiked, toggleLike } = useLikes();
   const { messages } = useTranslation();
+  const { openArtist } = useArtist();
 
   const progressPercent = duration > 0 ? (currentTime / duration) * 100 : 0;
   const cached = currentTrack ? isCached(currentTrack.id) : false;
@@ -42,8 +44,9 @@ export const PlayerBar: React.FC = () => {
   const upcomingCount = currentIndex >= 0 ? Math.max(0, queue.length - currentIndex - 1) : queue.length;
 
   const handleLikeClick = () => {
-    if (!currentTrack) return;
-    toggleLike(currentTrack);
+    if (currentTrack) {
+      toggleLike(currentTrack);
+    }
   };
 
   const handleCacheClick = () => {
@@ -70,9 +73,20 @@ export const PlayerBar: React.FC = () => {
           <span className="font-headline-sm text-body-lg text-white truncate font-medium">
             {currentTrack ? currentTrack.title : messages.player.not_playing}
           </span>
-          <span className="font-body-sm text-body-sm text-zinc-400 truncate">
-            {currentTrack ? currentTrack.artist : 'freakcloud'}
-          </span>
+          {currentTrack?.artist ? (
+            <button
+              type="button"
+              onClick={() => openArtist(currentTrack.artist)}
+              className="font-body-sm text-body-sm text-zinc-400 hover:text-white hover:underline truncate text-left w-fit max-w-full transition-colors focus:outline-none"
+              title={`Открыть карточку артиста: ${currentTrack.artist}`}
+            >
+              {currentTrack.artist}
+            </button>
+          ) : (
+            <span className="font-body-sm text-body-sm text-zinc-400 truncate">
+              {currentTrack ? currentTrack.artist : 'freakcloud'}
+            </span>
+          )}
         </div>
         {currentTrack && (
           <div className="flex items-center gap-1.5 ml-space-xs flex-shrink-0">

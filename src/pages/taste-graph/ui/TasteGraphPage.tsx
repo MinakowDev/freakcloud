@@ -9,6 +9,7 @@ import {
   blacklistNode,
 } from '../../../entities/track/lib/taste-graph';
 import { InteractiveTasteGraph } from '../../../widgets/interactive-graph/ui/InteractiveTasteGraph';
+import { useArtist } from '../../../entities/artist/model/artist-context';
 import './TasteGraphPage.css';
 
 type PageViewMode = 'graph' | 'list' | 'blacklist';
@@ -30,6 +31,7 @@ interface TasteGraphPageProps {
 export const TasteGraphPage: React.FC<TasteGraphPageProps> = ({ onNavigate }) => {
   const { messages } = useTranslation();
   const m = messages.taste_profile;
+  const { openArtist } = useArtist();
 
   const [viewMode, setViewMode] = useState<PageViewMode>('graph');
   const [listTab, setListTab] = useState<ListSubTab>('genres');
@@ -209,7 +211,18 @@ export const TasteGraphPage: React.FC<TasteGraphPageProps> = ({ onNavigate }) =>
 
                   <div className="tg-row__info">
                     <div className="flex items-center gap-3">
-                      <span className="tg-row__name">{item.name}</span>
+                      {listTab === 'artists' ? (
+                        <button
+                          type="button"
+                          onClick={() => openArtist(item.name)}
+                          className="tg-row__name hover:underline hover:text-white text-left transition-colors focus:outline-none"
+                          title={messages.artist?.open_card_hint || 'Открыть карточку артиста'}
+                        >
+                          {item.name}
+                        </button>
+                      ) : (
+                        <span className="tg-row__name">{item.name}</span>
+                      )}
                       <div className="opacity-0 group-hover:opacity-100 flex items-center gap-1 transition-opacity">
                         <button
                           type="button"
@@ -311,7 +324,14 @@ export const TasteGraphPage: React.FC<TasteGraphPageProps> = ({ onNavigate }) =>
                   <div className="flex flex-wrap gap-2">
                     {blacklist.artists.map((a) => (
                       <div key={a} className="px-2.5 py-1 bg-[#0d0d0d] border border-[#1a1a1a] rounded-[2px] text-xs text-zinc-300 flex items-center gap-2">
-                        <span>{a}</span>
+                        <button
+                          type="button"
+                          onClick={() => openArtist(a)}
+                          className="hover:underline hover:text-white transition-colors text-left focus:outline-none"
+                          title={messages.artist?.open_card_hint || 'Открыть карточку артиста'}
+                        >
+                          {a}
+                        </button>
                         <button
                           type="button"
                           onClick={() => handleUnblacklist('artist', a)}

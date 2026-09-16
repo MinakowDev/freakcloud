@@ -1,0 +1,112 @@
+/* Dark Industrial Neumorphism (Soft UI / Tactile Surfaces) for Freakcloud */
+
+:root {
+  --neu-bg-base: #0c0c0e;
+  --neu-bg-raised: linear-gradient(145deg, #151519, #0a0a0c);
+  --neu-bg-hover: linear-gradient(145deg, #18181d, #0d0d10);
+  --neu-border: rgba(255, 255, 255, 0.06);
+  --neu-border-hover: rgba(255, 255, 255, 0.12);
+  --neu-shadow-raised: -4px -4px 12px rgba(255, 255, 255, 0.035), 5px 7px 18px rgba(0, 0, 0, 0.7);
+  --neu-shadow-hover: -6px -6px 16px rgba(255, 255, 255, 0.06), 7px 12px 26px rgba(0, 0, 0, 0.85);
+  --neu-shadow-pressed: inset 2px 2px 6px rgba(0, 0, 0, 0.85), inset -2px -2px 5px rgba(255, 255, 255, 0.03);
+  --neu-shadow-inset: inset 2px 2px 6px rgba(0, 0, 0, 0.75), inset -1px -1px 4px rgba(255, 255, 255, 0.02);
+}
+
+/* 1. Neumorphic Cards (Albums, Playlists, Artists) */
+.neu-card {
+  background: var(--neu-bg-raised);
+  border: 1px solid var(--neu-border);
+  box-shadow: var(--neu-shadow-raised);
+  border-radius: 1rem; /* 16px */
+  transition: box-shadow 0.25s cubic-bezier(0.16, 1, 0.3, 1),
+              border-color 0.25s cubic-bezier(0.16, 1, 0.3, 1),
+              background 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.neu-card:hover {
+  background: var(--neu-bg-hover);
+  border-color: var(--neu-border-hover);
+  box-shadow: var(--neu-shadow-hover);
+}
+
+.neu-card:active {
+  background: var(--neu-bg-raised);
+}
+
+/* 1b. Static Neumorphic Surface (Modals, Dialogs, Static Cards) */
+.neu-card-static {
+  background: var(--neu-bg-raised);
+  border: 1px solid var(--neu-border);
+  box-shadow: var(--neu-shadow-raised);
+  border-radius: 1rem; /* 16px */
+}
+
+/* 2. Recessed Container (Image / Cover framing) */
+.neu-inset {
+  background: #09090b;
+  box-shadow: var(--neu-shadow-inset);
+  border: 1px solid rgba(0, 0, 0, 0.6);
+  border-radius: 0.75rem; /* 12px */
+  overflow: hidden;
+}
+
+/* 3. Neumorphic Buttons */
+.neu-button {
+  background: linear-gradient(145deg, #18181c, #0d0d10);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: -2px -2px 8px rgba(255, 255, 255, 0.04), 3px 4px 10px rgba(0, 0, 0, 0.6);
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.neu-button:hover {
+  background: linear-gradient(145deg, #222228, #111115);
+  border-color: rgba(255, 255, 255, 0.16);
+  box-shadow: -3px -3px 10px rgba(255, 255, 255, 0.07), 4px 6px 14px rgba(0, 0, 0, 0.75);
+  transform: scale(1.05);
+}
+
+.neu-button:active {
+  background: #0a0a0c;
+  box-shadow: var(--neu-shadow-pressed);
+  transform: scale(0.96);
+}
+
+/* 4. Primary White Accent Button in Neumorphic container */
+.neu-button-primary {
+  background: #ffffff;
+  color: #000000;
+  box-shadow: -2px -2px 8px rgba(255, 255, 255, 0.15), 4px 6px 16px rgba(0, 0, 0, 0.8);
+  transition: all 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.neu-button-primary:hover {
+  background: #f4f4f5;
+  transform: scale(1.08);
+  box-shadow: -3px -3px 12px rgba(255, 255, 255, 0.25), 5px 8px 20px rgba(0, 0, 0, 0.9);
+}
+
+.neu-button-primary:active {
+  transform: scale(0.94);
+  background: #e4e4e7;
+}
+
+/* 5. Neumorphic Badges */
+.neu-badge {
+  background: linear-gradient(145deg, #16161a, #0c0c0e);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: -1px -1px 4px rgba(255, 255, 255, 0.03), 2px 2px 6px rgba(0, 0, 0, 0.5);
+}
+
+/* 6. Shimmer glow keyframe for featured albums */
+@keyframes neuPulseGlow {
+  0%, 100% {
+    box-shadow: -4px -4px 12px rgba(255, 255, 255, 0.035), 5px 7px 18px rgba(0, 0, 0, 0.7);
+  }
+  50% {
+    box-shadow: -4px -4px 14px rgba(245, 158, 11, 0.08), 5px 7px 22px rgba(245, 158, 11, 0.12);
+  }
+}
+
+.neu-card-highlight {
+  animation: neuPulseGlow 4s ease-in-out infinite;
+}

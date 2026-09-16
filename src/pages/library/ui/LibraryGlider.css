@@ -23,14 +23,14 @@
 }
 
 .glass-radio-group label {
-  flex: 1;
+  flex: 1 1 0px;
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 5px;
-  min-width: 82px;
+  min-width: 76px;
   font-size: 12px;
-  padding: 0.28rem 0.68rem;
+  padding: 0.28rem 0.65rem;
   cursor: pointer;
   font-weight: 500;
   letter-spacing: 0.15px;
@@ -55,7 +55,7 @@
   position: absolute;
   top: 2.5px;
   bottom: 2.5px;
-  width: calc((100% - 5px) / 4);
+  width: calc((100% - 5px) / 6);
   border-radius: 9999px;
   z-index: 1;
   background: linear-gradient(135deg, rgba(255, 255, 255, 0.16), rgba(255, 255, 255, 0.05));
@@ -79,6 +79,25 @@
   transform: translateX(200%);
 }
 
-#library-tab-playlists:checked ~ .glass-glider {
+#library-tab-albums:checked ~ .glass-glider {
   transform: translateX(300%);
 }
+
+#library-tab-artists:checked ~ .glass-glider {
+  transform: translateX(400%);
+}
+
+#library-tab-playlists:checked ~ .glass-glider {
+  transform: translateX(500%);
+}
+
+@media (max-width: 1120px) {
+  .glass-radio-group label {
+    min-width: 64px;
+    font-size: 11px;
+    padding: 0.22rem 0.42rem;
+    gap: 3.5px;
+  }
+}
+
+

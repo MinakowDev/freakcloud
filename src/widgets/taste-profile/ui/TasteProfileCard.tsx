@@ -1,5 +1,6 @@
 import React, { useMemo } from 'react';
 import { useTranslation } from '../../../shared/lib/i18n';
+import { useArtist } from '../../../entities/artist/model/artist-context';
 import {
   loadTasteGraph,
   getEffectiveWeight,
@@ -56,6 +57,7 @@ function computeProfile(graph: TasteGraphData): {
 export const TasteProfileCard: React.FC<TasteProfileCardProps> = ({ onOpenTasteGraph }) => {
   const { messages } = useTranslation();
   const m = messages.taste_profile;
+  const { openArtist } = useArtist();
 
   const profile = useMemo(() => {
     const graph = loadTasteGraph();
@@ -63,45 +65,57 @@ export const TasteProfileCard: React.FC<TasteProfileCardProps> = ({ onOpenTasteG
   }, []);
 
   return (
-    <div className="taste-profile-card">
+    <div className="neu-card-static flex flex-col gap-4 p-5 rounded-2xl h-full select-none">
       {/* Header */}
       <div
-        className="taste-profile-card__header group cursor-pointer"
+        className="flex items-center justify-between pb-3 border-b border-white/[0.06] group cursor-pointer"
         onClick={onOpenTasteGraph}
-        title="Открыть граф вкусов"
+        title={m.open_taste_graph || 'Открыть граф вкусов'}
       >
-        <div className="flex items-center gap-2">
-          <i className="ri-node-tree text-white text-[16px]" />
-          <h3 className="font-headline-sm text-sm text-white font-semibold tracking-tight">
-            {m.title}
-          </h3>
+        <div className="flex items-center gap-2.5">
+          <div className="neu-button w-8 h-8 rounded-lg flex items-center justify-center text-amber-400">
+            <i className="ri-node-tree text-base" />
+          </div>
+          <div className="flex flex-col">
+            <h3 className="font-headline-sm text-sm text-white font-bold tracking-tight group-hover:text-amber-300 transition-colors">
+              {m.title}
+            </h3>
+            <span className="text-[10px] text-zinc-500 font-mono">
+              {profile.tracksInMemory > 0 ? `${profile.tracksInMemory} треков в анализе` : m.subtitle}
+            </span>
+          </div>
         </div>
-        <i className="ri-arrow-right-up-line text-zinc-500 group-hover:text-white text-sm transition-colors ml-auto" />
+        <div className="neu-button w-7 h-7 rounded-lg flex items-center justify-center text-zinc-400 group-hover:text-white transition-colors">
+          <i className="ri-arrow-right-up-line text-sm" />
+        </div>
       </div>
 
       {!profile.hasData ? (
-        <p className="taste-profile-card__empty">{m.not_enough_data}</p>
+        <div className="flex-1 flex flex-col items-center justify-center text-center text-zinc-500 py-6 gap-2">
+          <i className="ri-compass-discover-line text-2xl text-zinc-600" />
+          <p className="text-xs text-zinc-400 max-w-xs">{m.not_enough_data}</p>
+        </div>
       ) : (
         <div className="flex flex-col gap-4 flex-1">
-          {/* Top genres bars (flat, precision meters) */}
+          {/* Top genres bars */}
           {profile.topGenres.length > 0 && (
             <div className="flex flex-col gap-2.5">
-              <span className="font-mono text-[10px] text-zinc-500 uppercase tracking-wider">
+              <span className="font-mono text-[10px] text-zinc-500 uppercase tracking-wider font-semibold">
                 {m.top_genres}
               </span>
-              <div className="flex flex-col gap-2">
+              <div className="flex flex-col gap-2.5">
                 {profile.topGenres.map((g) => (
                   <div key={g.name} className="flex items-center gap-3">
                     <span className="text-xs text-zinc-300 w-24 truncate font-medium">
                       {g.name}
                     </span>
-                    <div className="flex-1 h-[2px] bg-[#1a1a1a]">
+                    <div className="neu-inset flex-1 h-2 rounded-full overflow-hidden p-0.5">
                       <div
-                        className="h-full bg-white transition-all duration-500"
+                        className="h-full rounded-full bg-gradient-to-r from-amber-500/80 to-amber-300 transition-all duration-500"
                         style={{ width: `${g.pct}%` }}
                       />
                     </div>
-                    <span className="font-mono text-[11px] text-zinc-500 w-9 text-right">
+                    <span className="font-mono text-[11px] text-zinc-400 w-9 text-right font-semibold">
                       {g.pct}%
                     </span>
                   </div>
@@ -110,36 +124,34 @@ export const TasteProfileCard: React.FC<TasteProfileCardProps> = ({ onOpenTasteG
             </div>
           )}
 
-          {/* Top artist (flat direct metadata) */}
+          {/* Top artist */}
           {profile.topArtist && (
-            <div className="flex items-baseline justify-between pt-1 border-t border-[#161616]">
-              <span className="font-mono text-[10px] text-zinc-500 uppercase tracking-wider">
+            <div className="flex items-center justify-between pt-2 border-t border-white/[0.06]">
+              <span className="font-mono text-[10px] text-zinc-500 uppercase tracking-wider font-semibold">
                 {m.top_artist}
               </span>
-              <span className="text-xs text-white font-medium truncate max-w-[180px]">
-                {profile.topArtist}
-              </span>
-            </div>
-          )}
-
-          {/* Memory counter */}
-          {profile.tracksInMemory > 0 && (
-            <div className="flex items-center justify-between font-mono text-[10px] text-zinc-600 uppercase tracking-wider">
-              <span>ПРОАНАЛИЗИРОВАНО</span>
-              <span>{profile.tracksInMemory} ТРЕКОВ</span>
+              <button
+                type="button"
+                onClick={() => openArtist(profile.topArtist!)}
+                className="text-xs text-amber-300 font-semibold truncate max-w-[180px] hover:text-white transition-colors focus:outline-none flex items-center gap-1"
+                title={messages.artist?.open_card_hint || 'Открыть карточку артиста'}
+              >
+                <span>{profile.topArtist}</span>
+                <i className="ri-arrow-right-s-line text-xs" />
+              </button>
             </div>
           )}
         </div>
       )}
 
-      {/* Industrial Action Button */}
+      {/* Tactile Action Button */}
       <button
         type="button"
-        className="taste-profile-card__btn"
+        className="neu-button w-full py-2.5 px-3.5 rounded-xl text-xs font-semibold text-zinc-300 hover:text-white flex items-center justify-between transition-colors mt-auto"
         onClick={onOpenTasteGraph}
       >
         <span>{m.open_taste_graph}</span>
-        <i className="ri-arrow-right-line text-xs" />
+        <i className="ri-arrow-right-line text-xs text-zinc-400" />
       </button>
     </div>
   );

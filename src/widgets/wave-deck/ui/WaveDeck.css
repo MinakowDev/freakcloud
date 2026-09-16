@@ -70,10 +70,9 @@
 
 .btn-launch-wave:hover {
   background: #f4f4f5;
-  transform: translateY(-1px);
   box-shadow: 0 6px 22px rgba(255, 255, 255, 0.28);
 }
 
 .btn-launch-wave:active {
-  transform: translateY(0);
+  background: #e4e4e7;
 }

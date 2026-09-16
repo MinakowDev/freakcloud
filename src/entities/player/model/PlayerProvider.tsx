@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState, useMemo } from 'react';
+import React, { useEffect, useRef, useState, useMemo, useCallback } from 'react';
 import type { AudioSource, Track } from '../../track/model/types';
 import { useCache } from '../../track/model/cache-context';
 import { AudioEngine } from '../lib/audio-engine';
@@ -66,12 +66,37 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const shuffleHistoryRef = useRef<number[]>([]);
   const lastPrevClickTimeRef = useRef<number>(0);
   const lastBroadcastSecRef = useRef<number>(-1);
+  const lastStateUpdateTimeRef = useRef<number>(0);
 
   const { isLiked, toggleLike } = useLikes();
   const isLikedRef = useRef(isLiked);
   isLikedRef.current = isLiked;
   const toggleLikeRef = useRef(toggleLike);
   toggleLikeRef.current = toggleLike;
+
+  // Cached tray broadcast helper to prevent dynamic imports inside hot loops
+  const broadcastTrayState = useCallback((cur: number, dur: number) => {
+    if (!tauriApi.isTauri()) return;
+    import('@tauri-apps/api/event').then(({ emit }) => {
+      const track = currentTrackRef.current;
+      const state: TrayPlayerState = {
+        track: track
+          ? {
+              id: track.id,
+              title: track.title,
+              artist: track.artist || '',
+              artwork_url: track.artwork_url,
+              duration_ms: track.duration_ms,
+            }
+          : null,
+        isPlaying: isPlayingRef.current,
+        currentTime: cur,
+        duration: dur,
+        isLiked: track ? isLikedRef.current(track.id) : false,
+      };
+      emit(TRAY_STATE_EVENT, state).catch(() => {});
+    }).catch(() => {});
+  }, []);
 
   const recordCurrentTrackBehavior = () => {
     const track = currentTrackRef.current;
@@ -216,31 +241,21 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
     engine.setListeners({
       onTimeUpdate: (cur, dur) => {
-        setCurrentTime(cur);
-        setDuration(dur);
+        currentTimeRef.current = cur;
+        durationRef.current = dur;
+
+        // Throttle React state updates to 250ms (4fps) for smooth scrub slider without cascading re-renders
+        const now = Date.now();
+        if (now - lastStateUpdateTimeRef.current >= 250 || cur === 0) {
+          lastStateUpdateTimeRef.current = now;
+          setCurrentTime(cur);
+          setDuration(dur);
+        }
+
+        // Broadcast to system tray once per second
         if (Math.floor(cur) !== Math.floor(lastBroadcastSecRef.current)) {
           lastBroadcastSecRef.current = cur;
-          if (tauriApi.isTauri()) {
-            import('@tauri-apps/api/event').then(({ emit }) => {
-              const track = currentTrackRef.current;
-              const state: TrayPlayerState = {
-                track: track
-                  ? {
-                      id: track.id,
-                      title: track.title,
-                      artist: track.artist || '',
-                      artwork_url: track.artwork_url,
-                      duration_ms: track.duration_ms,
-                    }
-                  : null,
-                isPlaying: isPlayingRef.current,
-                currentTime: cur,
-                duration: dur,
-                isLiked: track ? isLikedRef.current(track.id) : false,
-              };
-              emit(TRAY_STATE_EVENT, state).catch(() => {});
-            });
-          }
+          broadcastTrayState(cur, dur);
         }
       },
       onStatusChange: (status) => {
@@ -400,9 +415,10 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }
   }, [currentTrack?.id, autoCache, isCached, isManuallyRemoved, cacheTrack]);
 
-  // Infinite Wave Mode: auto-replenish queue when approaching the end
+  // Infinite Wave / Autoplay Mode: auto-replenish queue with batch when approaching the end
   useEffect(() => {
-    if (!isWaveMode) return;
+    const isAutoplayActive = isWaveMode || localStorage.getItem('freakcloud_autoplay_wave') !== 'false';
+    if (!isAutoplayActive) return;
     if (queue.length === 0) return;
 
     const remaining = queue.length - currentIndex;
@@ -422,7 +438,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
             likes: userLikes,
             cached: cachedTracksRef.current,
             excludeIds,
-            batchSize: 12,
+            batchSize: 10,
             currentTrackId: currentTrack?.id,
           });
 
@@ -436,7 +452,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         }
       })();
     }
-  }, [isWaveMode, queue.length, currentIndex]);
+  }, [isWaveMode, queue.length, currentIndex, currentTrack?.id]);
 
   const playTrackInternal = async (
     track: Track,
@@ -477,13 +493,26 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
   const playTrack = async (track: Track, newQueue?: Track[]) => {
     if (newQueue) {
-      // Starting a custom playlist resets infinite wave mode unless explicitly set
-      setWaveMode(false);
+      const autoplayPref = localStorage.getItem('freakcloud_autoplay_wave') !== 'false';
+      if (!autoplayPref) {
+        setWaveMode(false);
+      }
       shuffleHistoryRef.current = [];
     } else if (currentIndexRef.current >= 0) {
       shuffleHistoryRef.current.push(currentIndexRef.current);
     }
     await playTrackInternal(track, newQueue || (queue.length > 0 ? queue : [track]), undefined, false);
+  };
+
+  const playTrackAtIndex = async (idx: number) => {
+    const q = queueRef.current;
+    if (idx < 0 || idx >= q.length) return;
+    const target = q[idx];
+    if (!target) return;
+    if (currentIndexRef.current >= 0 && currentIndexRef.current !== idx) {
+      shuffleHistoryRef.current.push(currentIndexRef.current);
+    }
+    await playTrackInternal(target, q, idx, false);
   };
 
   const togglePlayPause = () => {
@@ -497,6 +526,8 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
   const seekTo = (seconds: number) => {
     engineRef.current?.seek(seconds);
+    currentTimeRef.current = seconds;
+    lastStateUpdateTimeRef.current = Date.now();
     setCurrentTime(seconds);
     if (tauriApi.isTauri() && currentTrackRef.current) {
       const track = currentTrackRef.current;
@@ -602,6 +633,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     isWaveMode,
     setWaveMode,
     playTrack,
+    playTrackAtIndex,
     togglePlayPause,
     nextTrack: () => handleNextTrack(false),
     previousTrack: handlePrevTrack,

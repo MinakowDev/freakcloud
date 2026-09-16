@@ -9,6 +9,7 @@ import { useTranslation } from '../../../shared/lib/i18n';
 import { useLikes } from '../../../entities/track/model/likes-context';
 import { useCache } from '../../../entities/track/model/cache-context';
 import { loadTasteGraph } from '../../../entities/track/lib/taste-graph';
+import { useDragScroll } from '../../../shared/lib/use-drag-scroll';
 
 interface SearchPageProps {
   searchQuery: string;
@@ -16,6 +17,75 @@ interface SearchPageProps {
   isSearching: boolean;
   onSelectQuery?: (query: string) => void;
 }
+
+type SearchTab = 'all' | 'tracks' | 'albums' | 'playlists';
+
+const SearchSlider: React.FC<{
+  items: Playlist[];
+  onOpenDetails: (p: Playlist) => void;
+  title: string;
+  icon: string;
+  iconColor?: string;
+  viewAllText?: string;
+  onViewAll?: () => void;
+}> = ({ items, onOpenDetails, title, icon, iconColor = 'text-white', viewAllText = 'Смотреть все', onViewAll }) => {
+  const { sliderRef, isDragging, scrollLeft, scrollRight, dragEvents } = useDragScroll();
+
+  return (
+    <section className="flex flex-col gap-2.5">
+      <div className="flex items-center justify-between pb-1">
+        <div className="flex items-center gap-2">
+          <i className={`${icon} ${iconColor} text-base`} />
+          <h2 className="font-headline-sm text-base font-bold text-white tracking-tight">{title}</h2>
+          <span className="text-xs text-zinc-500 font-mono">({items.length})</span>
+        </div>
+        <div className="flex items-center gap-2">
+          {onViewAll && items.length > 4 && (
+            <button
+              type="button"
+              onClick={onViewAll}
+              className="text-xs font-medium text-zinc-400 hover:text-white transition-colors flex items-center gap-1 mr-1"
+            >
+              <span>{viewAllText}</span>
+              <i className="ri-arrow-right-s-line text-sm" />
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={scrollLeft}
+            className="neu-button w-7 h-7 rounded-lg flex items-center justify-center text-zinc-400 hover:text-white"
+            title="Назад"
+          >
+            <i className="ri-arrow-left-s-line text-base" />
+          </button>
+          <button
+            type="button"
+            onClick={scrollRight}
+            className="neu-button w-7 h-7 rounded-lg flex items-center justify-center text-zinc-400 hover:text-white"
+            title="Вперед"
+          >
+            <i className="ri-arrow-right-s-line text-base" />
+          </button>
+        </div>
+      </div>
+
+      <div
+        ref={sliderRef}
+        {...dragEvents}
+        className={`flex items-stretch gap-4 overflow-x-auto scroll-smooth py-1 px-0.5 select-none ${
+          isDragging ? 'cursor-grabbing' : 'cursor-grab'
+        }`}
+        style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+      >
+        {items.map((item) => (
+          <div key={item.id} className="w-[185px] sm:w-[210px] shrink-0">
+            <PlaylistCard playlist={item} onOpenDetails={onOpenDetails} />
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+};
 
 const RECENT_SEARCHES_KEY = 'freakcloud_recent_searches';
 
@@ -40,8 +110,11 @@ export const SearchPage: React.FC<SearchPageProps> = ({
   const { likedTracks } = useLikes();
   const { cachedTracks } = useCache();
 
+  const [searchTab, setSearchTab] = useState<SearchTab>('all');
   const [playlistResults, setPlaylistResults] = useState<Playlist[]>([]);
   const [isSearchingPlaylists, setIsSearchingPlaylists] = useState(false);
+  const [albumResults, setAlbumResults] = useState<Playlist[]>([]);
+  const [isSearchingAlbums, setIsSearchingAlbums] = useState(false);
   const [selectedPlaylist, setSelectedPlaylist] = useState<Playlist | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
 
@@ -91,38 +164,47 @@ export const SearchPage: React.FC<SearchPageProps> = ({
     }
   };
 
-  // Search playlists whenever searchQuery changes
+  // Debounced search for playlists and albums (350ms)
   useEffect(() => {
     const trimmed = searchQuery.trim();
     if (!trimmed) {
       setPlaylistResults([]);
+      setAlbumResults([]);
       return;
     }
 
     let isMounted = true;
     setIsSearchingPlaylists(true);
+    setIsSearchingAlbums(true);
 
-    tauriApi
-      .searchPlaylists(trimmed)
-      .then((res) => {
-        if (isMounted) {
-          setPlaylistResults(res);
-          saveRecentSearch(trimmed);
-        }
-      })
-      .catch((err) => {
-        if (isMounted) {
+    const timer = setTimeout(() => {
+      Promise.all([
+        tauriApi.searchPlaylists(trimmed).catch((err) => {
           console.error('Failed to search playlists:', err);
-        }
-      })
-      .finally(() => {
-        if (isMounted) {
-          setIsSearchingPlaylists(false);
-        }
-      });
+          return [] as Playlist[];
+        }),
+        tauriApi.searchAlbums(trimmed).catch((err) => {
+          console.error('Failed to search albums:', err);
+          return [] as Playlist[];
+        }),
+      ])
+        .then(([playlists, albums]) => {
+          if (!isMounted) return;
+          setPlaylistResults(playlists);
+          setAlbumResults(albums);
+          saveRecentSearch(trimmed);
+        })
+        .finally(() => {
+          if (isMounted) {
+            setIsSearchingPlaylists(false);
+            setIsSearchingAlbums(false);
+          }
+        });
+    }, 350);
 
     return () => {
       isMounted = false;
+      clearTimeout(timer);
     };
   }, [searchQuery]);
 
@@ -193,34 +275,95 @@ export const SearchPage: React.FC<SearchPageProps> = ({
     setIsModalOpen(true);
   };
 
-  const isCurrentSearching = isSearching || isSearchingPlaylists;
+  const isCurrentSearching = isSearching || isSearchingPlaylists || isSearchingAlbums;
   const hasQuery = Boolean(searchQuery.trim());
-  const hasResults = searchResults.length > 0 || playlistResults.length > 0;
+  const hasResults = searchResults.length > 0 || playlistResults.length > 0 || albumResults.length > 0;
 
   return (
     <div className="flex flex-col gap-space-xl max-w-6xl w-full">
-      {/* Header with Title & Scanner Indicator */}
+      {/* Header with Title, Tabs & Scanner Indicator */}
       {hasQuery && (
-        <div className="animate-cascade flex items-center justify-between pb-space-sm border-b border-zinc-900" style={{ animationDelay: '0ms' }}>
-          <div className="flex items-center gap-3">
-            <h1 className="font-headline-md text-xl sm:text-2xl font-bold text-white tracking-tight">
-              {messages.search.results_title}: <span className="text-[#f7e479]">«{searchQuery}»</span>
-            </h1>
+        <div className="animate-cascade flex flex-col gap-3 pb-space-sm border-b border-zinc-900" style={{ animationDelay: '0ms' }}>
+          <div className="flex items-center justify-between flex-wrap gap-2">
+            <div className="flex items-center gap-3">
+              <h1 className="font-headline-md text-xl sm:text-2xl font-bold text-white tracking-tight">
+                {messages.search.results_title}: <span className="text-[#f7e479]">«{searchQuery}»</span>
+              </h1>
 
-            {isCurrentSearching && (
-              <div className="flex items-center gap-1 h-3.5 px-2 bg-zinc-900/80 rounded-full border-none" title="Сканирование SoundCloud...">
-                <span className="w-1 h-2 bg-[#f7e479] animate-pulse" />
-                <span className="w-1 h-3.5 bg-[#f7e479] animate-pulse" style={{ animationDuration: '0.4s' }} />
-                <span className="w-1 h-1.5 bg-[#f7e479] animate-pulse" style={{ animationDuration: '0.7s' }} />
-                <span className="text-[10px] text-zinc-400 font-mono ml-1">SCANNING</span>
-              </div>
-            )}
+              {isCurrentSearching && (
+                <div className="flex items-center gap-1 h-3.5 px-2 bg-zinc-900/80 rounded-full border-none" title="Сканирование SoundCloud...">
+                  <span className="w-1 h-2 bg-[#f7e479] animate-pulse" />
+                  <span className="w-1 h-3.5 bg-[#f7e479] animate-pulse" style={{ animationDuration: '0.4s' }} />
+                  <span className="w-1 h-1.5 bg-[#f7e479] animate-pulse" style={{ animationDuration: '0.7s' }} />
+                  <span className="text-[10px] text-zinc-400 font-mono ml-1">SCANNING</span>
+                </div>
+              )}
+            </div>
+
+            <div className="flex items-center gap-2 text-xs font-mono text-zinc-500">
+              {searchResults.length > 0 && <span>{searchResults.length} треков</span>}
+              {searchResults.length > 0 && (albumResults.length > 0 || playlistResults.length > 0) && <span>•</span>}
+              {albumResults.length > 0 && <span>{albumResults.length} альбомов</span>}
+              {albumResults.length > 0 && playlistResults.length > 0 && <span>•</span>}
+              {playlistResults.length > 0 && <span>{playlistResults.length} плейлистов</span>}
+            </div>
           </div>
 
-          <div className="flex items-center gap-2 text-xs font-mono text-zinc-500">
-            {playlistResults.length > 0 && <span>{playlistResults.length} плейлистов</span>}
-            {playlistResults.length > 0 && searchResults.length > 0 && <span>•</span>}
-            {searchResults.length > 0 && <span>{searchResults.length} треков</span>}
+          {/* Filter Tabs */}
+          <div className="flex items-center gap-2 flex-wrap">
+            <button
+              type="button"
+              onClick={() => setSearchTab('all')}
+              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                searchTab === 'all'
+                  ? 'neu-button text-white bg-zinc-800/90 border-zinc-600'
+                  : 'text-zinc-400 hover:text-zinc-200'
+              }`}
+            >
+              {messages.search?.tab_all || 'Все'}
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setSearchTab('tracks')}
+              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all flex items-center gap-1.5 ${
+                searchTab === 'tracks'
+                  ? 'neu-button text-white bg-zinc-800/90 border-zinc-600'
+                  : 'text-zinc-400 hover:text-zinc-200'
+              }`}
+            >
+              <i className="ri-music-2-line text-xs" />
+              <span>{messages.search?.tracks_section || 'Треки'}</span>
+              <span className="font-mono text-[10px] opacity-75">({searchResults.length})</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setSearchTab('albums')}
+              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all flex items-center gap-1.5 ${
+                searchTab === 'albums'
+                  ? 'neu-button text-amber-300 bg-zinc-800/90 border-amber-600/40'
+                  : 'text-zinc-400 hover:text-zinc-200'
+              }`}
+            >
+              <i className="ri-disc-line text-xs text-amber-400" />
+              <span>{messages.search?.albums_section || 'Альбомы'}</span>
+              <span className="font-mono text-[10px] opacity-75">({albumResults.length})</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setSearchTab('playlists')}
+              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all flex items-center gap-1.5 ${
+                searchTab === 'playlists'
+                  ? 'neu-button text-white bg-zinc-800/90 border-zinc-600'
+                  : 'text-zinc-400 hover:text-zinc-200'
+              }`}
+            >
+              <i className="ri-play-list-2-line text-xs text-[#f7e479]" />
+              <span>{messages.search?.playlists_section || 'Плейлисты'}</span>
+              <span className="font-mono text-[10px] opacity-75">({playlistResults.length})</span>
+            </button>
           </div>
         </div>
       )}
@@ -342,58 +485,111 @@ export const SearchPage: React.FC<SearchPageProps> = ({
             </div>
           )}
 
-          {/* SECTION 1: PLAYLISTS (Horizontal row / grid cards) */}
-          {(isSearchingPlaylists || playlistResults.length > 0) && (
-            <section className="flex flex-col gap-3">
-              <div className="flex items-center justify-between pb-1">
-                <div className="flex items-center gap-2">
-                  <i className="ri-play-list-2-line text-[#f7e479] text-base"></i>
-                  <h2 className="font-headline-sm text-base font-bold text-white tracking-tight">
-                    {messages.search.playlists_section}
-                  </h2>
-                  <span className="text-xs text-zinc-500 font-mono">({playlistResults.length})</span>
-                </div>
-              </div>
+          {/* TAB: ALL (Tracks first, then compact horizontal drag-pull sliders for albums and playlists) */}
+          {searchTab === 'all' && (
+            <>
+              {/* SECTION 1: TRACKS (Rendered FIRST!) */}
+              {(isSearching || searchResults.length > 0) && (
+                <section className="flex flex-col gap-3">
+                  <div className="flex items-center justify-between pb-1">
+                    <div className="flex items-center gap-2">
+                      <i className="ri-music-2-line text-[#f7e479] text-base" />
+                      <h2 className="font-headline-sm text-base font-bold text-white tracking-tight">
+                        {messages.search.tracks_section}
+                      </h2>
+                      <span className="text-xs text-zinc-500 font-mono">({searchResults.length})</span>
+                    </div>
+                  </div>
 
-              {isSearchingPlaylists && playlistResults.length === 0 ? (
-                <div className="py-8 flex items-center justify-center text-zinc-500 gap-2">
-                  <i className="ri-loader-4-line text-xl animate-spin text-[#f7e479]"></i>
-                  <span className="font-mono text-xs text-zinc-400">Поиск плейлистов...</span>
+                  {isSearching && searchResults.length === 0 ? (
+                    <div className="py-12 flex items-center justify-center text-zinc-500 gap-2">
+                      <i className="ri-loader-4-line text-xl animate-spin text-[#f7e479]" />
+                      <span className="font-mono text-xs text-zinc-400">Поиск треков...</span>
+                    </div>
+                  ) : (
+                    <TrackTable tracks={searchResults} emptyMessage={messages.search.no_results} />
+                  )}
+                </section>
+              )}
+
+              {/* SECTION 2: ALBUMS (Compact Drag-pull Slider) */}
+              {(isSearchingAlbums || albumResults.length > 0) && (
+                <SearchSlider
+                  items={albumResults}
+                  onOpenDetails={handleOpenDetails}
+                  title={messages.search.albums_section || 'Альбомы'}
+                  icon="ri-disc-line"
+                  iconColor="text-amber-400"
+                  viewAllText={messages.search?.view_all || 'Смотреть все'}
+                  onViewAll={() => setSearchTab('albums')}
+                />
+              )}
+
+              {/* SECTION 3: PLAYLISTS (Compact Drag-pull Slider) */}
+              {(isSearchingPlaylists || playlistResults.length > 0) && (
+                <SearchSlider
+                  items={playlistResults}
+                  onOpenDetails={handleOpenDetails}
+                  title={messages.search.playlists_section || 'Плейлисты'}
+                  icon="ri-play-list-2-line"
+                  iconColor="text-[#f7e479]"
+                  viewAllText={messages.search?.view_all || 'Смотреть все'}
+                  onViewAll={() => setSearchTab('playlists')}
+                />
+              )}
+            </>
+          )}
+
+          {/* TAB: TRACKS */}
+          {searchTab === 'tracks' && (
+            <section className="flex flex-col gap-3">
+              {isSearching && searchResults.length === 0 ? (
+                <div className="py-12 flex items-center justify-center text-zinc-500 gap-2">
+                  <i className="ri-loader-4-line text-xl animate-spin text-[#f7e479]" />
+                  <span className="font-mono text-xs text-zinc-400">Поиск треков...</span>
                 </div>
               ) : (
+                <TrackTable tracks={searchResults} emptyMessage={messages.search.no_results} />
+              )}
+            </section>
+          )}
+
+          {/* TAB: ALBUMS */}
+          {searchTab === 'albums' && (
+            <section className="flex flex-col gap-3">
+              {isSearchingAlbums && albumResults.length === 0 ? (
+                <div className="py-12 flex items-center justify-center text-zinc-500 gap-2">
+                  <i className="ri-loader-4-line text-xl animate-spin text-amber-400" />
+                  <span className="font-mono text-xs text-zinc-400">Поиск альбомов...</span>
+                </div>
+              ) : albumResults.length === 0 ? (
+                <div className="py-16 text-center text-zinc-500">Альбомы не найдены</div>
+              ) : (
                 <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
-                  {playlistResults.map((pl) => (
-                    <PlaylistCard
-                      key={pl.id}
-                      playlist={pl}
-                      onOpenDetails={handleOpenDetails}
-                    />
+                  {albumResults.map((al) => (
+                    <PlaylistCard key={al.id} playlist={al} onOpenDetails={handleOpenDetails} />
                   ))}
                 </div>
               )}
             </section>
           )}
 
-          {/* SECTION 2: TRACKS (Full table) */}
-          {(isSearching || searchResults.length > 0) && (
+          {/* TAB: PLAYLISTS */}
+          {searchTab === 'playlists' && (
             <section className="flex flex-col gap-3">
-              <div className="flex items-center justify-between pb-1">
-                <div className="flex items-center gap-2">
-                  <i className="ri-music-2-line text-[#f7e479] text-base"></i>
-                  <h2 className="font-headline-sm text-base font-bold text-white tracking-tight">
-                    {messages.search.tracks_section}
-                  </h2>
-                  <span className="text-xs text-zinc-500 font-mono">({searchResults.length})</span>
-                </div>
-              </div>
-
-              {isSearching && searchResults.length === 0 ? (
+              {isSearchingPlaylists && playlistResults.length === 0 ? (
                 <div className="py-12 flex items-center justify-center text-zinc-500 gap-2">
-                  <i className="ri-loader-4-line text-xl animate-spin text-[#f7e479]"></i>
-                  <span className="font-mono text-xs text-zinc-400">Поиск треков...</span>
+                  <i className="ri-loader-4-line text-xl animate-spin text-[#f7e479]" />
+                  <span className="font-mono text-xs text-zinc-400">Поиск плейлистов...</span>
                 </div>
+              ) : playlistResults.length === 0 ? (
+                <div className="py-16 text-center text-zinc-500">Плейлисты не найдены</div>
               ) : (
-                <TrackTable tracks={searchResults} emptyMessage={messages.search.no_results} />
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+                  {playlistResults.map((pl) => (
+                    <PlaylistCard key={pl.id} playlist={pl} onOpenDetails={handleOpenDetails} />
+                  ))}
+                </div>
               )}
             </section>
           )}

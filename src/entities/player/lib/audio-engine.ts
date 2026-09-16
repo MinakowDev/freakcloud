@@ -169,7 +169,8 @@ export class AudioEngine {
       } else {
         this.crossfadeTimer = null;
         fadeOutAudio.pause();
-        fadeOutAudio.src = '';
+        fadeOutAudio.removeAttribute('src');
+        fadeOutAudio.load();
         fadeInAudio.volume = targetVol;
       }
     };
@@ -225,14 +226,19 @@ export class AudioEngine {
     if (this.crossfadeTimer !== null) {
       clearTimeout(this.crossfadeTimer);
       this.crossfadeTimer = null;
+      this.secondaryAudio.pause();
+      this.secondaryAudio.removeAttribute('src');
+      this.secondaryAudio.load();
     }
   }
 
   public destroy(): void {
     this.clearCrossfadeTimer();
     this.primaryAudio.pause();
-    this.primaryAudio.src = '';
+    this.primaryAudio.removeAttribute('src');
+    this.primaryAudio.load();
     this.secondaryAudio.pause();
-    this.secondaryAudio.src = '';
+    this.secondaryAudio.removeAttribute('src');
+    this.secondaryAudio.load();
   }
 }

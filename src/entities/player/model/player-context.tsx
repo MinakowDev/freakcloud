@@ -20,6 +20,7 @@ export interface PlayerContextValue {
   isWaveMode: boolean;
   setWaveMode: (enabled: boolean) => void;
   playTrack: (track: Track, newQueue?: Track[]) => Promise<void>;
+  playTrackAtIndex: (index: number) => Promise<void>;
   togglePlayPause: () => void;
   nextTrack: () => void;
   previousTrack: () => void;

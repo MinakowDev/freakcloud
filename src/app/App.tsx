@@ -15,6 +15,9 @@ import { LoginPage } from '../pages/login/ui/LoginPage';
 import { TasteGraphPage } from '../pages/taste-graph/ui/TasteGraphPage';
 import { QueueAside } from '../widgets/queue-aside/ui/QueueAside';
 import { LoginModal } from '../widgets/auth/ui/LoginModal';
+import { ArtistProvider } from '../entities/artist/model/artist-context';
+import { ArtistDetailModal } from '../widgets/artist-detail/ui/ArtistDetailModal';
+import { AddToPlaylistModal } from '../widgets/playlist-action/ui/AddToPlaylistModal';
 import { tauriApi } from '../shared/api/tauri-client';
 import type { Track } from '../entities/track/model/types';
 import './styles/index.css';
@@ -128,36 +131,38 @@ export const AppContent: React.FC = () => {
             onSearchSubmit={() => performSearch(searchQuery)}
           />
 
-          <main className="flex-1 overflow-y-auto overflow-x-hidden p-space-lg flex flex-col items-center">
-            {currentPage === 'home' && (
-              <HomePage
-                onNavigate={navigateTo}
-                onSelectQuery={(q) => {
-                  setSearchQuery(q);
-                  navigateTo('search');
-                  performSearch(q);
-                }}
-              />
-            )}
-            {currentPage === 'search' && (
-              <SearchPage
-                searchQuery={searchQuery}
-                searchResults={searchResults}
-                isSearching={isSearching}
-                onSelectQuery={(q) => {
-                  setSearchQuery(q);
-                  performSearch(q);
-                }}
-              />
-            )}
-            {currentPage === 'library' && <LibraryPage />}
-            {currentPage === 'taste-graph' && <TasteGraphPage onNavigate={navigateTo} />}
-            {currentPage === 'settings' && <SettingsPage />}
-          </main>
-        </div>
+          <div className="flex-1 flex min-h-0 overflow-hidden relative">
+            <main className="flex-1 overflow-y-auto overflow-x-hidden p-space-lg flex flex-col items-center min-w-0">
+              {currentPage === 'home' && (
+                <HomePage
+                  onNavigate={navigateTo}
+                  onSelectQuery={(q) => {
+                    setSearchQuery(q);
+                    navigateTo('search');
+                    performSearch(q);
+                  }}
+                />
+              )}
+              {currentPage === 'search' && (
+                <SearchPage
+                  searchQuery={searchQuery}
+                  searchResults={searchResults}
+                  isSearching={isSearching}
+                  onSelectQuery={(q) => {
+                    setSearchQuery(q);
+                    performSearch(q);
+                  }}
+                />
+              )}
+              {currentPage === 'library' && <LibraryPage />}
+              {currentPage === 'taste-graph' && <TasteGraphPage onNavigate={navigateTo} />}
+              {currentPage === 'settings' && <SettingsPage />}
+            </main>
 
-        {/* Right Aside: Full-height animated Queue panel */}
-        <QueueAside />
+            {/* Right Aside: Animated Queue panel under Header */}
+            <QueueAside />
+          </div>
+        </div>
       </div>
 
       {/* 2. Bottom Player Bar */}
@@ -165,6 +170,12 @@ export const AppContent: React.FC = () => {
 
       {/* 3. SoundCloud OAuth Login Modal */}
       <LoginModal />
+
+      {/* 4. Artist Profile / Card Modal */}
+      <ArtistDetailModal />
+
+      {/* 5. Add Track To Custom Playlist Modal */}
+      <AddToPlaylistModal />
     </div>
   );
 };
@@ -176,7 +187,9 @@ export const App: React.FC = () => {
         <LikesProvider>
           <PlaylistProvider>
             <PlayerProvider>
-              <AppContent />
+              <ArtistProvider>
+                <AppContent />
+              </ArtistProvider>
             </PlayerProvider>
           </PlaylistProvider>
         </LikesProvider>

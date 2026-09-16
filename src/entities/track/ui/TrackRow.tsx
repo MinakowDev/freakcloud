@@ -4,17 +4,22 @@ import { formatDurationMs } from '../lib/format-time';
 import { usePlayer } from '../../player/model/player-context';
 import { useCache } from '../model/cache-context';
 import { useLikes } from '../model/likes-context';
+import { useArtist } from '../../artist/model/artist-context';
+import { usePlaylists } from '../../playlist/model/playlist-context';
 
 interface TrackRowProps {
   track: Track;
   index: number;
   queueList?: Track[];
+  onRemove?: () => void;
 }
 
-export const TrackRow: React.FC<TrackRowProps> = ({ track, index, queueList }) => {
+export const TrackRow: React.FC<TrackRowProps> = React.memo(({ track, index, queueList, onRemove }) => {
   const { currentTrack, isPlaying, playTrack, togglePlayPause, addToQueue } = usePlayer();
   const { isCached, isDownloading, cacheTrack, removeCachedTrack } = useCache();
   const { isLiked, toggleLike } = useLikes();
+  const { openArtist } = useArtist();
+  const { openAddToPlaylist } = usePlaylists();
 
   const isCurrent = currentTrack?.id === track.id;
   const cached = isCached(track.id);
@@ -32,6 +37,11 @@ export const TrackRow: React.FC<TrackRowProps> = ({ track, index, queueList }) =
   const handleLikeClick = (e: React.MouseEvent) => {
     e.stopPropagation();
     toggleLike(track);
+  };
+
+  const handleAddToPlaylistClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    openAddToPlaylist(track);
   };
 
   const handleCacheClick = (e: React.MouseEvent) => {
@@ -52,7 +62,7 @@ export const TrackRow: React.FC<TrackRowProps> = ({ track, index, queueList }) =
     <div
       onClick={handleRowClick}
       style={{ animationDelay: `${Math.min(index * 24, 400)}ms` }}
-      className={`animate-cascade grid grid-cols-[40px_1fr_96px_64px] items-center px-space-md py-2 rounded-md transition-colors group cursor-pointer w-full select-none ${
+      className={`track-row-virtualized animate-cascade grid grid-cols-[40px_1fr_auto_64px] items-center px-space-md py-2 rounded-md transition-colors group cursor-pointer w-full select-none gap-2 ${
         isCurrent
           ? 'bg-zinc-800 text-white font-medium'
           : 'hover:bg-zinc-900/90 text-zinc-300'
@@ -93,12 +103,24 @@ export const TrackRow: React.FC<TrackRowProps> = ({ track, index, queueList }) =
           <span className={`font-body-md text-body-md truncate ${isCurrent ? 'text-white' : 'text-zinc-200'}`}>
             {track.title}
           </span>
-          <span className="font-body-sm text-body-sm text-zinc-500 truncate">{track.artist}</span>
+          {track.artist ? (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                openArtist(track.artist);
+              }}
+              className="font-body-sm text-body-sm text-zinc-500 hover:text-white hover:underline truncate text-left w-fit max-w-full transition-colors focus:outline-none"
+              title={`Открыть карточку артиста: ${track.artist}`}
+            >
+              {track.artist}
+            </button>
+          ) : null}
         </div>
       </div>
 
-      {/* 3. Fixed Slot: Actions (Like + Queue + Cache) (96px) */}
-      <div className="flex items-center justify-center gap-1.5 w-24">
+      {/* 3. Fixed Slot: Actions (Like + Playlist + Queue + Cache) (124px) */}
+      <div className="flex items-center justify-center gap-1.5 w-[124px]">
         <button
           type="button"
           onClick={handleLikeClick}
@@ -108,6 +130,15 @@ export const TrackRow: React.FC<TrackRowProps> = ({ track, index, queueList }) =
           }`}
         >
           <i className={`${liked ? 'ri-heart-3-fill' : 'ri-heart-3-line'} text-[16px]`}></i>
+        </button>
+
+        <button
+          type="button"
+          onClick={handleAddToPlaylistClick}
+          title="Добавить в плейлист"
+          className="opacity-0 group-hover:opacity-100 text-zinc-400 hover:text-white transition-all w-6 h-6 flex items-center justify-center rounded hover:bg-zinc-800"
+        >
+          <i className="ri-folder-add-line text-base"></i>
         </button>
 
         <button
@@ -140,6 +171,20 @@ export const TrackRow: React.FC<TrackRowProps> = ({ track, index, queueList }) =
             <i className="ri-download-2-line text-[18px]"></i>
           </button>
         )}
+
+        {onRemove && (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onRemove();
+            }}
+            title="Удалить из плейлиста"
+            className="opacity-0 group-hover:opacity-100 text-red-400/70 hover:text-red-400 transition-all w-6 h-6 flex items-center justify-center rounded hover:bg-red-500/10"
+          >
+            <i className="ri-delete-bin-line text-[16px]" />
+          </button>
+        )}
       </div>
 
       {/* 4. Fixed Slot: Duration (64px) */}
@@ -148,4 +193,6 @@ export const TrackRow: React.FC<TrackRowProps> = ({ track, index, queueList }) =
       </div>
     </div>
   );
-};
+});
+
+TrackRow.displayName = 'TrackRow';

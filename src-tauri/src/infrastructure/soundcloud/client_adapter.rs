@@ -159,6 +159,41 @@ impl SoundCloudGateway for RSoundCloudAdapter {
         Ok(playlists)
     }
 
+    async fn search_albums(&self, query: &str, limit: u32, offset: u32) -> Result<Vec<Playlist>, DomainError> {
+        self.ensure_client().await?;
+        let client_guard = self.client.read().await;
+        let client = client_guard.as_ref().ok_or_else(|| {
+            DomainError::SoundCloud("SoundCloud недоступен (запустите zapret или проверьте сеть)".to_string())
+        })?;
+        let params = CollectionParams {
+            limit: Some(limit),
+            offset: Some(offset),
+        };
+
+        let items = client
+            .search_albums(query.to_string(), params)
+            .await
+            .map_err(|e| DomainError::SoundCloud(format!("Search albums failed: {:?}", e)))?;
+
+        let albums = items
+            .into_iter()
+            .map(|item| Playlist {
+                id: item.album_playlist.id,
+                title: item.album_playlist.title,
+                author: item.user.user.username,
+                author_id: Some(item.user.user.id),
+                duration_ms: (item.album_playlist.duration as u32).max(0),
+                artwork_url: item.album_playlist.artwork_url,
+                track_count: (item.album_playlist.track_count as u32).max(0),
+                permalink_url: Some(item.album_playlist.permalink_url),
+                is_album: true,
+                tracks: None,
+            })
+            .collect();
+
+        Ok(albums)
+    }
+
     async fn get_playlist(&self, playlist_id: u64) -> Result<Playlist, DomainError> {
         self.ensure_client().await?;
         let client_guard = self.client.read().await;
@@ -216,6 +251,44 @@ impl SoundCloudGateway for RSoundCloudAdapter {
 
     async fn resolve_stream_url(&self, track_id: u64) -> Result<String, DomainError> {
         self.ensure_client().await?;
+
+        // 1. Try to fetch author's original master file (320kbps / FLAC / WAV) if downloadable
+        if self.cached_client_id.read().await.is_none() {
+            if let Ok(id) = SoundCloudClient::generate_client_id().await {
+                *self.cached_client_id.write().await = Some(id);
+            }
+        }
+        let client_id = self.cached_client_id.read().await.clone().unwrap_or_default();
+
+        if !client_id.is_empty() {
+            let download_url = format!(
+                "https://api-v2.soundcloud.com/tracks/{}/download?client_id={}",
+                track_id, client_id
+            );
+            let mut dl_req = self.http.get(&download_url);
+            if let Some(token) = self.current_token.read().await.as_ref() {
+                dl_req = dl_req.header("Authorization", format!("OAuth {}", token));
+            }
+            if let Ok(dl_resp) = dl_req.send().await {
+                if dl_resp.status().is_success() {
+                    #[derive(serde::Deserialize)]
+                    struct DownloadResponse {
+                        #[serde(rename = "redirectUri")]
+                        redirect_uri: Option<String>,
+                    }
+                    if let Ok(dl_data) = dl_resp.json::<DownloadResponse>().await {
+                        if let Some(uri) = dl_data.redirect_uri {
+                            if !uri.is_empty() {
+                                println!("[Stream] Resolved author original master track (320k/Lossless): {}", track_id);
+                                return Ok(uri);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // 2. Otherwise fetch stream transcodings
         let sc_track = {
             let client_guard = self.client.read().await;
             let client = client_guard.as_ref().ok_or_else(|| {
@@ -227,11 +300,24 @@ impl SoundCloudGateway for RSoundCloudAdapter {
                 .map_err(|e| DomainError::SoundCloud(format!("Failed to fetch track {}: {:?}", track_id, e)))?
         };
 
-        // Find progressive MP3 or HLS stream transcoding from track media
+        // Find highest quality transcoding:
+        // - HQ tier (quality == "hq", AAC 256kbps or Opus)
+        // - Progressive MP3 (128 kbps)
+        // - Any progressive
+        // - First available
         let transcodings = &sc_track.track.media.transcodings;
         let target_transcoding = transcodings
             .iter()
-            .find(|t| t.format.protocol == "progressive" && t.format.mime_type.contains("audio/mpeg"))
+            .find(|t| {
+                t.quality.as_str() == "hq"
+                    || t.format.mime_type.contains("aac")
+                    || t.format.mime_type.contains("mp4a")
+            })
+            .or_else(|| {
+                transcodings
+                    .iter()
+                    .find(|t| t.format.protocol == "progressive" && t.format.mime_type.contains("audio/mpeg"))
+            })
             .or_else(|| transcodings.iter().find(|t| t.format.protocol == "progressive"))
             .or_else(|| transcodings.first())
             .ok_or_else(|| DomainError::StreamNotAvailable(track_id))?;

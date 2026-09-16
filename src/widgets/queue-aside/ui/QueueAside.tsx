@@ -2,6 +2,7 @@ import React from 'react';
 import { usePlayer } from '../../../entities/player/model/player-context';
 import { useTranslation } from '../../../shared/lib/i18n';
 import { formatDurationMs } from '../../../entities/track/lib/format-time';
+import { useArtist } from '../../../entities/artist/model/artist-context';
 
 export const QueueAside: React.FC = () => {
   const {
@@ -10,14 +11,16 @@ export const QueueAside: React.FC = () => {
     currentIndex,
     isQueueOpen,
     toggleQueueOpen,
-    playTrack,
+    playTrackAtIndex,
     removeFromQueue,
     clearQueue,
     isPlaying,
   } = usePlayer();
 
   const { messages } = useTranslation();
+  const { openArtist } = useArtist();
 
+  const pastTracks = currentIndex > 0 ? queue.slice(0, currentIndex) : [];
   const upcomingStartIndex = currentIndex >= 0 ? currentIndex + 1 : 0;
   const upcomingTracks = queue.slice(upcomingStartIndex);
 
@@ -87,9 +90,19 @@ export const QueueAside: React.FC = () => {
                   <span className="font-body-md text-xs text-white truncate font-medium">
                     {currentTrack.title}
                   </span>
-                  <span className="font-body-sm text-[11px] text-zinc-400 truncate">
-                    {currentTrack.artist}
-                  </span>
+                  {currentTrack.artist ? (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        openArtist(currentTrack.artist);
+                      }}
+                      className="font-body-sm text-[11px] text-zinc-400 hover:text-white hover:underline truncate text-left w-fit max-w-full transition-colors focus:outline-none"
+                      title={`Открыть карточку артиста: ${currentTrack.artist}`}
+                    >
+                      {currentTrack.artist}
+                    </button>
+                  ) : null}
                 </div>
                 <div className="pr-1 text-zinc-400">
                   {isPlaying ? (
@@ -123,7 +136,7 @@ export const QueueAside: React.FC = () => {
                     <div
                       key={`${t.id}-${actualQueueIndex}`}
                       className="flex items-center gap-2.5 p-1.5 rounded hover:bg-[#121214] transition-colors group cursor-pointer"
-                      onClick={() => playTrack(t, queue)}
+                      onClick={() => playTrackAtIndex(actualQueueIndex)}
                     >
                       <span className="font-label-sm text-[11px] text-zinc-600 w-4 text-center group-hover:hidden">
                         {idx + 1}
@@ -146,9 +159,19 @@ export const QueueAside: React.FC = () => {
                         <span className="font-body-md text-xs text-zinc-200 group-hover:text-white truncate">
                           {t.title}
                         </span>
-                        <span className="font-body-sm text-[11px] text-zinc-500 truncate">
-                          {t.artist}
-                        </span>
+                        {t.artist ? (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              openArtist(t.artist);
+                            }}
+                            className="font-body-sm text-[11px] text-zinc-500 hover:text-white hover:underline truncate text-left w-fit max-w-full transition-colors focus:outline-none"
+                            title={`Открыть карточку артиста: ${t.artist}`}
+                          >
+                            {t.artist}
+                          </button>
+                        ) : null}
                       </div>
 
                       <span className="font-label-sm text-[10px] text-zinc-500 tabular-nums">
@@ -172,6 +195,68 @@ export const QueueAside: React.FC = () => {
               </div>
             )}
           </div>
+
+          {/* Past Tracks Section */}
+          {pastTracks.length > 0 && (
+            <div className="flex flex-col gap-1.5 pt-2 border-t border-zinc-900/60">
+              <div className="flex items-center justify-between px-1">
+                <span className="font-label-sm text-[11px] text-zinc-500 uppercase tracking-wider">
+                  {messages.player.previously_played || 'Ранее играли'} ({pastTracks.length})
+                </span>
+              </div>
+
+              <div className="flex flex-col gap-1">
+                {pastTracks.map((t, pastIdx) => (
+                  <div
+                    key={`past-${t.id}-${pastIdx}`}
+                    className="flex items-center gap-2.5 p-1.5 rounded hover:bg-[#121214] transition-colors group cursor-pointer opacity-75 hover:opacity-100"
+                    onClick={() => playTrackAtIndex(pastIdx)}
+                    title="Слушать снова"
+                  >
+                    <span className="font-label-sm text-[11px] text-zinc-600 w-4 text-center group-hover:hidden">
+                      {pastIdx + 1}
+                    </span>
+                    <i className="ri-play-fill text-xs text-white hidden group-hover:block w-4 text-center"></i>
+
+                    <div className="w-8 h-8 rounded-[2px] overflow-hidden bg-zinc-900 flex-shrink-0 flex items-center justify-center">
+                      {t.artwork_url ? (
+                        <img
+                          src={t.artwork_url}
+                          alt=""
+                          className="w-full h-full object-cover grayscale-[20%] group-hover:grayscale-0"
+                        />
+                      ) : (
+                        <i className="ri-disc-line text-zinc-600 text-sm"></i>
+                      )}
+                    </div>
+
+                    <div className="flex flex-col min-w-0 flex-1">
+                      <span className="font-body-md text-xs text-zinc-300 group-hover:text-white truncate">
+                        {t.title}
+                      </span>
+                      {t.artist ? (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            openArtist(t.artist);
+                          }}
+                          className="font-body-sm text-[11px] text-zinc-500 hover:text-white hover:underline truncate text-left w-fit max-w-full transition-colors focus:outline-none"
+                          title={`Открыть карточку артиста: ${t.artist}`}
+                        >
+                          {t.artist}
+                        </button>
+                      ) : null}
+                    </div>
+
+                    <span className="font-label-sm text-[10px] text-zinc-500 tabular-nums">
+                      {formatDurationMs(t.duration_ms)}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </aside>

@@ -6,6 +6,7 @@ import { WaveDeck } from '../../../widgets/wave-deck/ui/WaveDeck';
 import { DynamicGreeting } from '../../../widgets/greeting/ui/DynamicGreeting';
 import { TasteVibes } from '../../../widgets/taste-vibes/ui/TasteVibes';
 import { TasteProfileCard } from '../../../widgets/taste-profile/ui/TasteProfileCard';
+import { AlbumRecommendations } from '../../../widgets/album-recommendations/ui/AlbumRecommendations';
 import { SupportBanner } from '../../../widgets/support-banner/ui/SupportBanner';
 import type { PageView } from '../../../widgets/sidebar/ui/Sidebar';
 
@@ -43,7 +44,10 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate, onSelectQuery })
       {/* 3. Personal Wave Deck */}
       <WaveDeck />
 
-      {/* 4. Two-column: Taste Profile + Recent Tracks */}
+      {/* 4. Album Recommendations */}
+      <AlbumRecommendations />
+
+      {/* 5. Two-column: Taste Profile + Recent Tracks */}
       <div className="home-bottom-grid">
         {/* Left: Taste Profile Card */}
         <TasteProfileCard onOpenTasteGraph={handleOpenTasteGraph} />

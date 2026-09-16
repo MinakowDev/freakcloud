@@ -230,6 +230,16 @@ pub async fn search_playlists(
 }
 
 #[tauri::command]
+pub async fn search_albums(
+    state: State<'_, AppState>,
+    query: String,
+    limit: Option<u32>,
+    offset: Option<u32>,
+) -> Result<Vec<Playlist>, DomainError> {
+    state.manage_playlists.search_albums(&query, limit, offset).await
+}
+
+#[tauri::command]
 pub async fn get_playlist_details(
     state: State<'_, AppState>,
     playlist_id: u64,

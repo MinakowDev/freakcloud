@@ -13,6 +13,9 @@ pub trait SoundCloudGateway: Send + Sync {
     /// Поиск плейлистов (исключая альбомы) по запросу
     async fn search_playlists(&self, query: &str, limit: u32, offset: u32) -> Result<Vec<Playlist>, DomainError>;
 
+    /// Поиск альбомов по запросу
+    async fn search_albums(&self, query: &str, limit: u32, offset: u32) -> Result<Vec<Playlist>, DomainError>;
+
     /// Получение информации о плейлисте по его ID
     async fn get_playlist(&self, playlist_id: u64) -> Result<Playlist, DomainError>;
 

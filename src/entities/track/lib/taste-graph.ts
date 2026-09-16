@@ -164,6 +164,13 @@ function saveTasteGraph(graph: TasteGraphData): void {
   }
 }
 
+export function clearTasteBlacklist(): void {
+  const graph = loadTasteGraph();
+  graph.blacklist = { artists: [], genres: [] };
+  saveTasteGraph(graph);
+  window.dispatchEvent(new Event('freakcloud_taste_updated'));
+}
+
 function pruneGraph(graph: TasteGraphData): void {
   // Prune recent tracks
   if (graph.recentPlayedIds.length > MAX_RECENT_TRACKS) {
@@ -551,6 +558,7 @@ export function addCustomSeed(type: 'artist' | 'genre', name: string): void {
 export function resetTasteGraph(): void {
   try {
     localStorage.removeItem(STORAGE_KEY);
+    window.dispatchEvent(new Event('freakcloud_taste_updated'));
   } catch {
     // ignore
   }

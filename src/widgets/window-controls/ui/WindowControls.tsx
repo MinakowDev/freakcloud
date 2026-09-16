@@ -62,7 +62,7 @@ export const WindowControls: React.FC = () => {
   }
 
   return (
-    <div className="flex items-center h-14 -mr-space-lg select-none" data-tauri-drag-region="false">
+    <div className="flex items-center h-14 select-none shrink-0" data-tauri-drag-region="false">
       {/* Minimize */}
       <button
         type="button"

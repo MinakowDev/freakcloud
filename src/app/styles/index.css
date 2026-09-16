@@ -1,3 +1,5 @@
+@import './neumorphism.css';
+
 /* Custom range slider styling for Adwaita / Amberol player scrubber */
 input[type="range"] {
   -webkit-appearance: none;
@@ -106,9 +108,16 @@ a:focus-visible {
   align-items: start;
 }
 
-@media (max-width: 860px) {
+@media (max-width: 1080px) {
   .home-bottom-grid {
     grid-template-columns: 1fr;
   }
 }
+
+/* Native Chromium list virtualization for zero-overhead scrolling */
+.track-row-virtualized {
+  content-visibility: auto;
+  contain-intrinsic-size: 0 48px;
+}
+
 

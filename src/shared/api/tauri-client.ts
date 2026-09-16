@@ -44,6 +44,10 @@ export const tauriApi = {
     return safeInvoke<Playlist[]>('search_playlists', { query, limit, offset }, []);
   },
 
+  searchAlbums: async (query: string, limit = 20, offset = 0): Promise<Playlist[]> => {
+    return safeInvoke<Playlist[]>('search_albums', { query, limit, offset }, []);
+  },
+
   getPlaylistDetails: async (playlistId: number): Promise<Playlist> => {
     return safeInvoke<Playlist>('get_playlist_details', { playlistId });
   },

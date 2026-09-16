@@ -3,6 +3,7 @@ import { usePlayer } from '../../../entities/player/model/player-context';
 import { useLikes } from '../../../entities/track/model/likes-context';
 import { useCache } from '../../../entities/track/model/cache-context';
 import { useTranslation } from '../../../shared/lib/i18n';
+import { useArtist } from '../../../entities/artist/model/artist-context';
 import { tauriApi } from '../../../shared/api/tauri-client';
 import type { Track } from '../../../entities/track/model/types';
 import {
@@ -27,6 +28,7 @@ export const InteractiveTasteGraph: React.FC<InteractiveTasteGraphProps> = ({ on
   const { playTrack, setWaveMode } = usePlayer();
   const { likedTracks, soundCloudTracks } = useLikes();
   const { cachedTracks } = useCache();
+  const { openArtist } = useArtist();
 
   // Combine user tracks across likes, cache, soundcloud and recent listening history
   const allUserTracks = useMemo(() => {
@@ -43,6 +45,33 @@ export const InteractiveTasteGraph: React.FC<InteractiveTasteGraphProps> = ({ on
   const likedTrackIds = useMemo(() => {
     return new Set(likedTracks.map((t) => t.id));
   }, [likedTracks]);
+
+  // Artist Avatars: map lowercased artist name -> artwork url
+  const [asyncAvatars, setAsyncAvatars] = useState<Map<string, string>>(() => new Map());
+
+  const artistAvatarMap = useMemo(() => {
+    const map = new Map<string, string>();
+    allUserTracks.forEach((t) => {
+      if (t?.artist && t?.artwork_url) {
+        const lower = t.artist.trim().toLowerCase();
+        if (!map.has(lower)) {
+          map.set(lower, t.artwork_url.replace('-large.', '-t500x500.'));
+        }
+      }
+    });
+    asyncAvatars.forEach((url, name) => {
+      if (!map.has(name)) {
+        map.set(name, url);
+      }
+    });
+    return map;
+  }, [allUserTracks, asyncAvatars]);
+
+  const artistAvatarMapRef = useRef(artistAvatarMap);
+  artistAvatarMapRef.current = artistAvatarMap;
+
+  // Cache for loaded HTMLImageElement instances used in canvas render loop
+  const imageCacheRef = useRef<Map<string, HTMLImageElement>>(new Map());
 
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
@@ -62,10 +91,45 @@ export const InteractiveTasteGraph: React.FC<InteractiveTasteGraphProps> = ({ on
     hoveredNodeId: null as string | null,
   });
 
+  const isSleepingRef = useRef<boolean>(false);
+  const wakeUpRef = useRef<() => void>(() => {});
+
   const [scaleDisplay, setScaleDisplay] = useState(1.0);
   const [selectedNode, setSelectedNode] = useState<VisualGraphNode | null>(null);
   const [isPhysicsActive, setIsPhysicsActive] = useState(true);
   const [isLaunchingWave, setIsLaunchingWave] = useState(false);
+
+  // Asynchronously resolve avatars for artist nodes missing in local tracks
+  useEffect(() => {
+    const missingArtists = nodesRef.current
+      .filter((n) => n.type === 'artist' && !artistAvatarMap.has(n.name.trim().toLowerCase()))
+      .map((n) => n.name.trim());
+
+    if (missingArtists.length === 0) return;
+
+    let isMounted = true;
+    missingArtists.slice(0, 8).forEach((artistName) => {
+      tauriApi
+        .searchTracks(artistName, 1)
+        .then((tracks) => {
+          if (!isMounted || !tracks || tracks.length === 0) return;
+          const match = tracks.find((t) => Boolean(t.artwork_url));
+          const artwork = match?.artwork_url;
+          if (artwork) {
+            setAsyncAvatars((prev) => {
+              const next = new Map(prev);
+              next.set(artistName.toLowerCase(), artwork.replace('-large.', '-t500x500.'));
+              return next;
+            });
+          }
+        })
+        .catch(() => {});
+    });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [artistAvatarMap]);
 
   // 1. Initialize graph data from user tastes
   const reloadData = useCallback(() => {
@@ -80,18 +144,20 @@ export const InteractiveTasteGraph: React.FC<InteractiveTasteGraphProps> = ({ on
     const cy = rect ? rect.height / 2 : 155;
 
     nodesRef.current = nodes.map((n, i) => {
+      const radius = n.type === 'artist' ? Math.max(16, Math.min(26, n.radius * 1.35)) : n.radius;
       const existing = existingMap.get(n.id);
       if (existing && existing.x !== undefined && existing.y !== undefined) {
-        return { ...n, x: existing.x, y: existing.y, vx: existing.vx || 0, vy: existing.vy || 0 };
+        return { ...n, radius, x: existing.x, y: existing.y, vx: existing.vx || 0, vy: existing.vy || 0 };
       }
       // Distribute radially around center
       if (n.type === 'user') {
-        return { ...n, x: cx, y: cy, vx: 0, vy: 0 };
+        return { ...n, radius, x: cx, y: cy, vx: 0, vy: 0 };
       }
       const angle = (i / Math.max(1, nodes.length)) * Math.PI * 2 + Math.random() * 0.4;
-      const dist = n.type === 'genre' ? 70 + Math.random() * 35 : 110 + Math.random() * 45;
+      const dist = n.type === 'genre' ? 70 + Math.random() * 35 : 120 + Math.random() * 45;
       return {
         ...n,
+        radius,
         x: cx + Math.cos(angle) * dist,
         y: cy + Math.sin(angle) * dist,
         vx: (Math.random() - 0.5) * 0.6,
@@ -129,6 +195,7 @@ export const InteractiveTasteGraph: React.FC<InteractiveTasteGraphProps> = ({ on
 
     const ro = new ResizeObserver(() => {
       updateDimensions();
+      wakeUpRef.current();
     });
     ro.observe(canvas);
 
@@ -140,6 +207,7 @@ export const InteractiveTasteGraph: React.FC<InteractiveTasteGraphProps> = ({ on
       const newScale = Math.max(0.25, Math.min(3.5, cameraRef.current.scale * zoomFactor));
       cameraRef.current.scale = newScale;
       setScaleDisplay(Math.round(newScale * 100) / 100);
+      wakeUpRef.current();
     };
 
     canvas.addEventListener('wheel', handleNativeWheel, { passive: false });
@@ -185,6 +253,7 @@ export const InteractiveTasteGraph: React.FC<InteractiveTasteGraphProps> = ({ on
       const nodes = nodesRef.current;
       const edges = edgesRef.current;
       const nodeMap = new Map(nodes.map((n) => [n.id, n]));
+      let maxMovement = 0;
 
       // Physics update (if active)
       if (isPhysicsActive) {
@@ -202,7 +271,7 @@ export const InteractiveTasteGraph: React.FC<InteractiveTasteGraphProps> = ({ on
             const dx = n2.x - n1.x;
             const dy = n2.y - n1.y;
             const dist = Math.sqrt(dx * dx + dy * dy) || 1;
-            const minAllowed = (n1.radius + n2.radius) * 1.5;
+            const minAllowed = n1.radius + n2.radius + 8;
 
             if (dist < 320) {
               const force = (kRepel / (dist * dist)) * (dist < minAllowed ? 2.5 : 1);
@@ -247,7 +316,7 @@ export const InteractiveTasteGraph: React.FC<InteractiveTasteGraphProps> = ({ on
           }
         });
 
-        // Centering gravity towards (cx, cy)
+        // Centering gravity towards (cx, cy) and track kinetic movement
         nodes.forEach((n) => {
           if (n.type === 'user') {
             n.x = cx;
@@ -260,6 +329,11 @@ export const InteractiveTasteGraph: React.FC<InteractiveTasteGraphProps> = ({ on
           const gDy = cy - (n.y || cy);
           n.vx = ((n.vx || 0) + gDx * 0.001) * damping;
           n.vy = ((n.vy || 0) + gDy * 0.001) * damping;
+
+          const mv = Math.abs(n.vx || 0) + Math.abs(n.vy || 0);
+          if (mv > maxMovement) {
+            maxMovement = mv;
+          }
 
           n.x = (n.x || cx) + (n.vx || 0);
           n.y = (n.y || cy) + (n.vy || 0);
@@ -325,16 +399,53 @@ export const InteractiveTasteGraph: React.FC<InteractiveTasteGraphProps> = ({ on
           ctx.lineWidth = isSelected ? 2 : 1;
           ctx.stroke();
         } else {
-          // Artist nodes: Slate neutral
-          ctx.beginPath();
-          ctx.arc(n.x, n.y, r, 0, Math.PI * 2);
-          ctx.fillStyle = isSelected ? '#ffffff' : isHovered ? '#a1a1aa' : '#52525b';
-          ctx.fill();
+          // Artist nodes: Render cropped circular artist photo with tactile ring
+          const avatarUrl = artistAvatarMapRef.current.get(n.name.trim().toLowerCase());
+          let drawnImage = false;
 
+          if (avatarUrl) {
+            let img = imageCacheRef.current.get(avatarUrl);
+            if (!img) {
+              img = new Image();
+              img.crossOrigin = 'anonymous';
+              img.src = avatarUrl;
+              imageCacheRef.current.set(avatarUrl, img);
+            }
+
+            if (img.complete && img.naturalWidth > 0) {
+              ctx.save();
+              ctx.beginPath();
+              ctx.arc(n.x, n.y, r, 0, Math.PI * 2);
+              ctx.clip();
+              ctx.drawImage(img, n.x - r, n.y - r, r * 2, r * 2);
+              ctx.restore();
+              drawnImage = true;
+            }
+          }
+
+          if (!drawnImage) {
+            // Fallback: Slate circle with first letter watermark
+            ctx.beginPath();
+            ctx.arc(n.x, n.y, r, 0, Math.PI * 2);
+            ctx.fillStyle = isSelected ? '#3f3f46' : isHovered ? '#27272a' : '#18181b';
+            ctx.fill();
+
+            ctx.font = `600 ${Math.round(r * 0.85)}px ui-monospace, SFMono-Regular, monospace`;
+            ctx.fillStyle = isSelected ? '#ffffff' : isHovered ? '#a1a1aa' : '#52525b';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(n.name.charAt(0).toUpperCase(), n.x, n.y);
+          }
+
+          // Outer ring border
           ctx.beginPath();
           ctx.arc(n.x, n.y, r, 0, Math.PI * 2);
-          ctx.strokeStyle = '#181818';
-          ctx.lineWidth = 1;
+          ctx.strokeStyle = isSelected
+            ? '#ffffff'
+            : isHovered
+            ? '#f7e479'
+            : 'rgba(255, 255, 255, 0.25)';
+          ctx.lineWidth = isSelected ? 2.5 : isHovered ? 2 : 1;
           ctx.stroke();
         }
 
@@ -349,8 +460,28 @@ export const InteractiveTasteGraph: React.FC<InteractiveTasteGraphProps> = ({ on
       });
 
       ctx.restore();
+
+      // Kinetic Energy Sleep Algorithm:
+      // When node movement is below threshold (< 0.025) and no active user drag/pan is ongoing
+      const isInteracting = cameraRef.current.isDraggingCanvas || !!cameraRef.current.draggedNodeId;
+      if (isPhysicsActive && !isInteracting && maxMovement < 0.025) {
+        isSleepingRef.current = true;
+        animId = 0;
+        return; // Physics converged: enter sleep mode (0.0% CPU/GPU cycles)
+      }
+
+      isSleepingRef.current = false;
       animId = requestAnimationFrame(render);
     };
+
+    const wakeUp = () => {
+      if (isSleepingRef.current || animId === 0) {
+        isSleepingRef.current = false;
+        if (animId) cancelAnimationFrame(animId);
+        animId = requestAnimationFrame(render);
+      }
+    };
+    wakeUpRef.current = wakeUp;
 
     render();
 
@@ -391,6 +522,7 @@ export const InteractiveTasteGraph: React.FC<InteractiveTasteGraphProps> = ({ on
   }, []);
 
   const handleMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    wakeUpRef.current();
     const world = screenToWorld(e.clientX, e.clientY);
     const clickedNode = findNodeAt(world.x, world.y);
 
@@ -411,6 +543,7 @@ export const InteractiveTasteGraph: React.FC<InteractiveTasteGraphProps> = ({ on
 
     // Drag node
     if (cam.draggedNodeId) {
+      wakeUpRef.current();
       const node = nodesRef.current.find((n) => n.id === cam.draggedNodeId);
       if (node) {
         node.x = world.x;
@@ -423,6 +556,7 @@ export const InteractiveTasteGraph: React.FC<InteractiveTasteGraphProps> = ({ on
 
     // Drag canvas (Pan)
     if (cam.isDraggingCanvas) {
+      wakeUpRef.current();
       cam.panX = e.clientX - cam.dragStartX;
       cam.panY = e.clientY - cam.dragStartY;
       return;
@@ -430,10 +564,15 @@ export const InteractiveTasteGraph: React.FC<InteractiveTasteGraphProps> = ({ on
 
     // Hover detection
     const hovered = findNodeAt(world.x, world.y);
-    cam.hoveredNodeId = hovered ? hovered.id : null;
+    const newHoveredId = hovered ? hovered.id : null;
+    if (cam.hoveredNodeId !== newHoveredId) {
+      cam.hoveredNodeId = newHoveredId;
+      wakeUpRef.current();
+    }
   };
 
   const handleMouseUp = () => {
+    wakeUpRef.current();
     cameraRef.current.isDraggingCanvas = false;
     cameraRef.current.draggedNodeId = null;
   };
@@ -580,10 +719,22 @@ export const InteractiveTasteGraph: React.FC<InteractiveTasteGraphProps> = ({ on
                 {selectedNode.type === 'genre'
                   ? (m.node_genre || 'Микрожанр')
                   : selectedNode.type === 'artist'
-                  ? (m.node_artist || 'Исполнитель')
-                  : (m.node_user || 'Центр вкуса')}
+                    ? (m.node_artist || 'Исполнитель')
+                    : (m.node_user || 'Центр вкуса')}
               </span>
-              <h4 className="itg-inspector__title">{selectedNode.name}</h4>
+              {selectedNode.type === 'artist' ? (
+                <button
+                  type="button"
+                  onClick={() => openArtist(selectedNode.name)}
+                  className="itg-inspector__title itg-inspector__title--clickable hover:underline hover:text-white text-left transition-colors flex items-center gap-1.5 focus:outline-none"
+                  title={messages.artist?.open_card_hint || 'Открыть карточку артиста'}
+                >
+                  <span>{selectedNode.name}</span>
+                  <i className="ri-arrow-right-up-line text-xs opacity-60" />
+                </button>
+              ) : (
+                <h4 className="itg-inspector__title">{selectedNode.name}</h4>
+              )}
             </div>
             <button
               type="button"
@@ -638,7 +789,19 @@ export const InteractiveTasteGraph: React.FC<InteractiveTasteGraphProps> = ({ on
                         </div>
                         <div className="itg-track-row__info">
                           <span className="itg-track-row__title">{track.title}</span>
-                          <span className="itg-track-row__artist">{track.artist}</span>
+                          {track.artist ? (
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                openArtist(track.artist);
+                              }}
+                              className="itg-track-row__artist hover:underline hover:text-white text-left transition-colors focus:outline-none"
+                              title={`Открыть карточку артиста: ${track.artist}`}
+                            >
+                              {track.artist}
+                            </button>
+                          ) : null}
                         </div>
                         {likedTrackIds.has(track.id) && (
                           <i className="ri-heart-fill itg-track-row__liked" />
@@ -660,6 +823,17 @@ export const InteractiveTasteGraph: React.FC<InteractiveTasteGraphProps> = ({ on
                   <i className={`ri-play-fill ${isLaunchingWave ? 'animate-spin' : ''}`} />
                   <span>{isLaunchingWave ? '...' : (m.wave_btn || 'Волна')}</span>
                 </button>
+
+                {selectedNode.type === 'artist' && (
+                  <button
+                    type="button"
+                    className="itg-btn-neu itg-btn-neu--icon"
+                    onClick={() => openArtist(selectedNode.name)}
+                    title={messages.artist?.card_title || 'Карточка артиста'}
+                  >
+                    <i className="ri-user-star-line text-zinc-300" />
+                  </button>
+                )}
 
                 <button
                   type="button"
@@ -692,22 +866,6 @@ export const InteractiveTasteGraph: React.FC<InteractiveTasteGraphProps> = ({ on
           )}
         </div>
       )}
-
-      {/* Minimal Industrial Legend Overlay */}
-      <div className="itg-legend-overlay">
-        <span>
-          <span className="itg-legend-dot bg-white" />
-          ЦЕНТР
-        </span>
-        <span>
-          <span className="itg-legend-dot bg-[#d4d4d8]" />
-          ЖАНРЫ
-        </span>
-        <span>
-          <span className="itg-legend-dot bg-[#52525b]" />
-          АРТИСТЫ
-        </span>
-      </div>
     </div>
   );
 };

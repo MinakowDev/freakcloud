@@ -21,30 +21,31 @@ export const Header: React.FC<HeaderProps> = ({
   return (
     <header
       data-tauri-drag-region
-      className="w-full h-14 bg-black border-b border-zinc-900/80 z-30 grid grid-cols-3 items-center px-space-lg select-none flex-shrink-0"
+      className="w-full h-14 bg-black border-b border-zinc-900/80 z-30 flex items-center justify-between pl-4 sm:pl-6 pr-0 gap-3 select-none flex-shrink-0 min-w-0"
     >
-      {/* Col 1 (Left): Drag region / spacer */}
-      <div className="flex items-center h-full" data-tauri-drag-region />
+      {/* Left (Drag region / subtle spacer) */}
+      <div className="w-8 sm:w-16 h-full flex items-center flex-shrink-0" data-tauri-drag-region />
 
-      {/* Col 2 (Center): Centered Studio Search Input */}
-      <div className="flex items-center justify-center">
+      {/* Center: Fluid Centered Studio Search Input */}
+      <div className="flex-1 max-w-[440px] min-w-[140px] flex items-center justify-center px-1">
         <StudioSearchInput
           value={searchQuery}
           onChange={onSearchChange}
           onSubmit={onSearchSubmit}
-          className="w-72 sm:w-[420px]"
+          className="w-full"
         />
       </div>
 
-      {/* Col 3 (Right): Login button (if guest) & Window Controls */}
-      <div className="flex items-center justify-end gap-space-sm">
+      {/* Right: Login button (if guest) & Window Controls flush to corner */}
+      <div className="flex items-center justify-end gap-2 flex-shrink-0 h-full">
         {!session.is_authenticated && (
           <button
             onClick={openOAuthModal}
-            className="flex items-center gap-1.5 px-space-md py-1 rounded-full bg-white text-black font-body-sm text-body-sm font-medium hover:bg-zinc-200 transition-colors shadow-sm"
+            className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-white text-black font-body-sm text-xs font-medium hover:bg-zinc-200 transition-colors shadow-sm"
+            title={messages.auth.login_btn}
           >
-            <i className="ri-soundcloud-line text-[18px]"></i>
-            <span>{messages.auth.login_btn}</span>
+            <i className="ri-soundcloud-line text-base"></i>
+            <span className="hidden sm:inline">{messages.auth.login_btn}</span>
           </button>
         )}
 

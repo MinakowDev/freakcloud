@@ -4,6 +4,9 @@ import { usePlaylists } from '../../../entities/playlist/model/playlist-context'
 import { usePlayer } from '../../../entities/player/model/player-context';
 import { tauriApi } from '../../../shared/api/tauri-client';
 import { useTranslation } from '../../../shared/lib/i18n';
+import { useArtist } from '../../../entities/artist/model/artist-context';
+import { entityCache } from '../../../shared/lib/entity-cache';
+import { PlaylistCover } from './PlaylistCover';
 
 interface PlaylistCardProps {
   playlist: Playlist;
@@ -14,6 +17,7 @@ export const PlaylistCard: React.FC<PlaylistCardProps> = ({ playlist, onOpenDeta
   const { isPlaylistSaved, savePlaylist, removeSavedPlaylist } = usePlaylists();
   const { playTrack } = usePlayer();
   const { messages } = useTranslation();
+  const { openArtist } = useArtist();
   const [isPlayingLoading, setIsPlayingLoading] = useState(false);
 
   const isSaved = isPlaylistSaved(playlist.id);
@@ -37,10 +41,19 @@ export const PlaylistCard: React.FC<PlaylistCardProps> = ({ playlist, onOpenDeta
       setIsPlayingLoading(true);
       let tracks = playlist.tracks;
       if (!tracks || tracks.length === 0) {
-        const details = await tauriApi.getPlaylistDetails(playlist.id);
-        tracks = details.tracks || [];
+        const cached = entityCache.getCachedPlaylist(playlist.id);
+        if (cached && cached.tracks && cached.tracks.length > 0) {
+          tracks = cached.tracks;
+        } else {
+          const details = await tauriApi.getPlaylistDetails(playlist.id);
+          tracks = details.tracks || [];
+          entityCache.setCachedPlaylist(playlist.id, {
+            ...details,
+            tracks,
+          });
+        }
       }
-      if (tracks.length > 0) {
+      if (tracks && tracks.length > 0) {
         await playTrack(tracks[0], tracks);
       }
     } catch (err) {
@@ -59,40 +72,25 @@ export const PlaylistCard: React.FC<PlaylistCardProps> = ({ playlist, onOpenDeta
   return (
     <div
       onClick={() => onOpenDetails(playlist)}
-      className="group relative flex flex-col p-3 bg-zinc-950/80 hover:bg-zinc-900/90 border border-zinc-900 hover:border-zinc-700/60 transition-all duration-300 cursor-pointer select-none"
+      className="neu-card group relative flex flex-col p-3.5 cursor-pointer select-none rounded-2xl"
     >
-      {/* Artwork Container */}
-      <div className="relative aspect-square w-full bg-zinc-900 overflow-hidden mb-3">
-        {playlist.artwork_url ? (
-          <img
-            src={playlist.artwork_url.replace('-large.', '-t500x500.')}
-            alt={playlist.title}
-            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500 ease-out"
-            loading="lazy"
-          />
-        ) : (
-          <div className="w-full h-full flex items-center justify-center bg-zinc-900 text-zinc-700">
-            <i className="ri-play-list-2-line text-4xl"></i>
-          </div>
-        )}
+      {/* Artwork Container in Recessed Frame */}
+      <div className="neu-inset relative aspect-square w-full mb-3 overflow-hidden">
+        <PlaylistCover playlist={playlist} />
 
-        {/* Badge: Плейлист */}
-        <div className="absolute top-2 left-2 px-2 py-0.5 bg-black/75 backdrop-blur-md text-[10px] font-semibold uppercase tracking-wider text-zinc-300 border border-white/10">
-          {messages.library.playlist_badge || 'Плейлист'}
-        </div>
 
         {/* Action buttons overlay on hover */}
-        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex items-center justify-center gap-3">
+        <div className="absolute inset-0 bg-black/45 backdrop-blur-[2px] opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex items-center justify-center gap-3">
           {/* Play button */}
           <button
             type="button"
             onClick={handlePlayNow}
             disabled={isPlayingLoading}
-            className="w-12 h-12 rounded-full bg-white text-black flex items-center justify-center shadow-lg hover:scale-110 active:scale-95 transition-transform duration-200"
-            title="Воспроизвести всё"
+            className="neu-button-primary w-12 h-12 rounded-full flex items-center justify-center disabled:opacity-50"
+            title="Слушать прямо сейчас"
           >
             {isPlayingLoading ? (
-              <i className="ri-loader-4-line animate-spin text-xl"></i>
+              <i className="ri-loader-4-line text-xl animate-spin"></i>
             ) : (
               <i className="ri-play-fill text-2xl ml-0.5"></i>
             )}
@@ -102,10 +100,10 @@ export const PlaylistCard: React.FC<PlaylistCardProps> = ({ playlist, onOpenDeta
           <button
             type="button"
             onClick={handleToggleSave}
-            className={`w-9 h-9 rounded-full backdrop-blur-md flex items-center justify-center transition-transform hover:scale-110 active:scale-95 ${
+            className={`neu-button w-9 h-9 rounded-full flex items-center justify-center ${
               isSaved
-                ? 'bg-amber-400/20 text-amber-300 border border-amber-400/40'
-                : 'bg-black/60 text-white border border-white/20 hover:border-white/40'
+                ? 'text-amber-300 border-amber-400/40 bg-amber-950/40'
+                : 'text-white'
             }`}
             title={isSaved ? 'Удалить из медиатеки' : 'Сохранить в медиатеку'}
           >
@@ -114,20 +112,30 @@ export const PlaylistCard: React.FC<PlaylistCardProps> = ({ playlist, onOpenDeta
         </div>
 
         {/* Track count indicator */}
-        <div className="absolute bottom-2 right-2 px-1.5 py-0.5 bg-black/80 backdrop-blur-sm text-[10px] font-mono text-zinc-300">
+        <div className="absolute bottom-2.5 right-2.5 px-2 py-0.5 bg-black/85 backdrop-blur-md rounded-md text-[10px] font-mono text-zinc-300 border border-white/5">
           {playlist.track_count} {messages.library.tracks_count || 'треков'}
         </div>
       </div>
 
       {/* Info */}
-      <div className="flex flex-col gap-0.5 min-w-0">
-        <h3 className="font-headline-sm text-sm font-semibold text-white truncate group-hover:text-zinc-100 transition-colors" title={playlist.title}>
+      <div className="flex flex-col gap-1 min-w-0 px-0.5">
+        <h3 className="font-headline-sm text-sm font-semibold text-white truncate group-hover:text-amber-300 transition-colors duration-200" title={playlist.title}>
           {playlist.title}
         </h3>
-        <p className="font-body-sm text-xs text-zinc-400 truncate" title={playlist.author}>
-          {playlist.author}
-        </p>
-        <div className="flex items-center gap-2 mt-1.5 text-[11px] text-zinc-500 font-mono">
+        {playlist.author ? (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              openArtist(playlist.author);
+            }}
+            className="font-body-sm text-xs text-zinc-400 hover:text-white hover:underline truncate text-left w-fit max-w-full transition-colors focus:outline-none"
+            title={`Карточка артиста: ${playlist.author}`}
+          >
+            {playlist.author}
+          </button>
+        ) : null}
+        <div className="flex items-center gap-2 mt-1 text-[11px] text-zinc-500 font-mono">
           <span>{formattedDuration()}</span>
           <span>•</span>
           <span>{playlist.track_count} треков</span>

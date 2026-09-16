@@ -13,7 +13,7 @@ use interfaces::tauri::commands::{
     get_current_session, get_my_likes, get_playlist_details, get_related_tracks,
     get_saved_playlists, get_track_details, get_track_stream, get_trending, is_playlist_saved,
     is_track_cached, like_track, login_with_token, logout, open_soundcloud_login,
-    remove_cached_track, remove_saved_playlist, save_playlist, search_playlists, search_tracks,
+    remove_cached_track, remove_saved_playlist, save_playlist, search_albums, search_playlists, search_tracks,
     set_discord_client_id, set_discord_rpc_enabled, unlike_track, update_discord_rpc,
 };
 
@@ -188,6 +188,7 @@ fn show_main_window(app: tauri::AppHandle) {
         .invoke_handler(tauri::generate_handler![
             search_tracks,
             search_playlists,
+            search_albums,
             get_playlist_details,
             get_saved_playlists,
             save_playlist,

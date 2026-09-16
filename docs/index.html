@@ -4,9 +4,9 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>freakcloud — SoundCloud десктоп плеер</title>
+  <title>freakcloud — SoundCloud десктоп плеер нового поколения</title>
   <meta name="description"
-    content="Быстрый и минималистичный десктопный плеер для SoundCloud. Бесконечная персональная волна, локальный кэш и плавная смена треков." />
+    content="Ультралегковесный десктопный плеер для SoundCloud на Rust и Tauri v2. Потребляет ~40 МБ памяти, бесконечная волна, интерактивный граф вкусов и локальный кэш." />
   <meta name="theme-color" content="#000000" />
   <link rel="icon" type="image/png" href="logo.png" />
 
@@ -21,19 +21,22 @@
   <style>
     :root {
       --bg: #000000;
-      --card: rgba(16, 16, 20, 0.6);
+      --card: rgba(16, 16, 20, 0.7);
+      --card-border: rgba(255, 255, 255, 0.08);
       --card-hover: rgba(255, 255, 255, 0.04);
+      --card-hover-border: rgba(247, 228, 121, 0.3);
       --white: #ffffff;
       --muted: #8e8e93;
       --dim: #48484a;
       --gold: #f7e479;
+      --gold-dim: rgba(247, 228, 121, 0.15);
 
       --font-display: 'Outfit', sans-serif;
       --font-body: 'Plus Jakarta Sans', -apple-system, sans-serif;
       --font-mono: 'JetBrains Mono', monospace;
     }
 
-    /* Строгий запрет на скругления и любые обводки */
+    /* Строгий запрет на скругления согласно дизайн-системе freakcloud */
     *,
     *::before,
     *::after {
@@ -41,7 +44,6 @@
       margin: 0;
       padding: 0;
       border-radius: 0 !important;
-      border: none !important;
       outline: none !important;
     }
 
@@ -61,17 +63,18 @@
       position: relative;
     }
 
-    /* Фоновый мягкий свет (Blur) */
+    /* Фоновое мягкое свечение (Blur) */
     .ambient-glow {
       position: absolute;
       top: -140px;
       left: 50%;
       transform: translateX(-50%);
-      width: 700px;
-      height: 420px;
-      background: radial-gradient(circle, rgba(247, 228, 121, 0.06) 0%, rgba(255, 255, 255, 0.02) 40%, transparent 70%);
-      filter: blur(120px);
-      -webkit-filter: blur(120px);
+      width: 800px;
+      max-width: 100vw;
+      height: 460px;
+      background: radial-gradient(circle, rgba(247, 228, 121, 0.07) 0%, rgba(255, 255, 255, 0.02) 40%, transparent 70%);
+      filter: blur(130px);
+      -webkit-filter: blur(130px);
       pointer-events: none;
       z-index: 0;
       animation: ambientPulse 12s infinite ease-in-out alternate;
@@ -80,17 +83,16 @@
     @keyframes ambientPulse {
       0% {
         transform: translateX(-50%) scale(1);
-        opacity: 0.7;
+        opacity: 0.6;
       }
-
       100% {
-        transform: translateX(-49%) scale(1.08);
-        opacity: 1;
+        transform: translateX(-50%) scale(1.08);
+        opacity: 0.95;
       }
     }
 
     .container {
-      max-width: 1000px;
+      max-width: 1100px;
       margin: 0 auto;
       padding: 0 28px;
       position: relative;
@@ -102,16 +104,18 @@
       position: sticky;
       top: 0;
       z-index: 100;
-      background: rgba(0, 0, 0, 0.82);
+      background: rgba(0, 0, 0, 0.88);
       backdrop-filter: blur(28px);
       -webkit-backdrop-filter: blur(28px);
+      border-bottom: 1px solid rgba(255, 255, 255, 0.06) !important;
     }
 
     .nav-inner {
       display: flex;
       align-items: center;
       justify-content: space-between;
-      height: 72px;
+      height: 70px;
+      position: relative;
     }
 
     .brand {
@@ -123,15 +127,15 @@
     }
 
     .brand-logo {
-      width: 30px;
-      height: 30px;
+      width: 32px;
+      height: 32px;
       object-fit: cover;
       display: block;
     }
 
     .brand-title {
       font-family: var(--font-display);
-      font-size: 16px;
+      font-size: 17px;
       font-weight: 700;
       letter-spacing: -0.02em;
       color: var(--white);
@@ -140,7 +144,7 @@
     .nav-links {
       display: flex;
       align-items: center;
-      gap: 32px;
+      gap: 28px;
     }
 
     .nav-link {
@@ -155,37 +159,39 @@
       color: var(--white);
     }
 
-    /* Каскадная анимация */
-    @keyframes cascadeIn {
-      from {
-        opacity: 0;
-        transform: translateY(14px);
-      }
-
-      to {
-        opacity: 1;
-        transform: translateY(0);
-      }
+    /* Бургер-кнопка для мобильных */
+    .mobile-menu-btn {
+      display: none;
+      background: transparent;
+      color: var(--white);
+      font-size: 22px;
+      cursor: pointer;
+      padding: 8px;
+      border: 1px solid rgba(255, 255, 255, 0.1) !important;
+      transition: background-color 0.2s ease, border-color 0.2s ease;
     }
 
-    .animate-cascade {
-      animation: cascadeIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) backwards;
+    .mobile-menu-btn:hover {
+      background: rgba(255, 255, 255, 0.06);
+      border-color: rgba(255, 255, 255, 0.25) !important;
     }
 
-    /* Главный экран / Описание */
+    /* Главный экран / Hero */
     .hero {
-      padding: 90px 0 70px;
+      padding: 85px 0 50px;
     }
+
 
     .hero-title {
       font-family: var(--font-display);
-      font-size: clamp(34px, 5vw, 56px);
+      font-size: clamp(30px, 5.2vw, 58px);
       font-weight: 800;
-      line-height: 1.1;
+      line-height: 1.12;
       letter-spacing: -0.035em;
       color: var(--white);
       margin-bottom: 20px;
-      max-width: 780px;
+      max-width: 840px;
+      word-break: break-word;
     }
 
     .hero-title span {
@@ -196,21 +202,22 @@
       font-size: 16px;
       line-height: 1.6;
       color: var(--muted);
-      max-width: 620px;
-      margin-bottom: 36px;
+      max-width: 660px;
+      margin-bottom: 34px;
     }
 
     .hero-actions {
       display: flex;
       align-items: center;
-      gap: 18px;
+      gap: 16px;
       flex-wrap: wrap;
     }
 
+    /* Статичные ховеры: запрет на transform смещения */
     .btn-main {
       background: var(--white);
       color: var(--bg);
-      padding: 13px 28px;
+      padding: 13px 26px;
       font-size: 13px;
       font-weight: 600;
       text-decoration: none;
@@ -218,35 +225,47 @@
       align-items: center;
       gap: 8px;
       cursor: pointer;
-      transition: background 0.2s ease, transform 0.2s ease;
+      border: 1px solid var(--white) !important;
+      transition: background-color 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
     }
 
     .btn-main:hover {
       background: #e4e4e7;
-      transform: translateY(-2px);
+      box-shadow: 0 0 16px rgba(255, 255, 255, 0.25);
     }
 
     .btn-text {
-      background: transparent;
+      background: rgba(255, 255, 255, 0.05);
       color: var(--white);
-      padding: 13px 18px;
+      padding: 13px 20px;
       font-size: 13px;
       font-weight: 500;
       text-decoration: none;
       display: inline-flex;
       align-items: center;
-      gap: 6px;
-      transition: color 0.2s ease, transform 0.2s ease;
+      gap: 8px;
+      border: 1px solid rgba(255, 255, 255, 0.1) !important;
+      transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease;
     }
 
     .btn-text:hover {
+      background: rgba(255, 255, 255, 0.1);
+      border-color: rgba(255, 255, 255, 0.3) !important;
       color: var(--gold);
-      transform: translateX(3px);
     }
 
-    /* Секция Фичи */
-    .section {
-      padding: 70px 0;
+    /* Секция Скриншотов / Showcase */
+    .showcase-section {
+      padding: 20px 0 65px;
+    }
+
+    .showcase-header {
+      display: flex;
+      align-items: flex-end;
+      justify-content: space-between;
+      margin-bottom: 20px;
+      flex-wrap: wrap;
+      gap: 16px;
     }
 
     .section-title {
@@ -255,7 +274,137 @@
       font-weight: 700;
       letter-spacing: -0.02em;
       color: var(--white);
-      margin-bottom: 28px;
+    }
+
+    .showcase-tabs {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      background: rgba(16, 16, 20, 0.6);
+      padding: 4px;
+      border: 1px solid var(--card-border) !important;
+    }
+
+    .tab-btn {
+      background: transparent;
+      color: var(--muted);
+      font-family: var(--font-body);
+      font-size: 12px;
+      font-weight: 600;
+      padding: 8px 14px;
+      cursor: pointer;
+      border: 1px solid transparent !important;
+      transition: background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      white-space: nowrap;
+    }
+
+    .tab-btn:hover {
+      color: var(--white);
+      background: rgba(255, 255, 255, 0.04);
+    }
+
+    .tab-btn.active {
+      background: rgba(247, 228, 121, 0.12);
+      color: var(--gold);
+      border-color: rgba(247, 228, 121, 0.35) !important;
+    }
+
+    .showcase-display {
+      position: relative;
+      background: #08080a;
+      border: 1px solid rgba(255, 255, 255, 0.1) !important;
+      box-shadow: 0 24px 60px rgba(0, 0, 0, 0.8), 0 0 30px rgba(247, 228, 121, 0.03);
+      overflow: hidden;
+    }
+
+    .showcase-toolbar {
+      height: 36px;
+      background: #111115;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 14px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.06) !important;
+    }
+
+    .window-dots {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .window-dot {
+      width: 10px;
+      height: 10px;
+      background: #2a2a30;
+      display: inline-block;
+    }
+
+    .window-title {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--muted);
+      letter-spacing: 0.02em;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      max-width: 60%;
+    }
+
+    .showcase-image-wrap {
+      position: relative;
+      width: 100%;
+      background: #050507;
+      min-height: 400px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+    }
+
+    .showcase-img {
+      width: 100%;
+      height: auto;
+      max-height: 640px;
+      object-fit: contain;
+      display: block;
+      transition: opacity 0.25s ease;
+    }
+
+    .showcase-caption {
+      padding: 14px 18px;
+      background: #0d0d10;
+      border-top: 1px solid rgba(255, 255, 255, 0.06) !important;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+
+    .caption-text {
+      font-size: 13px;
+      color: var(--muted);
+      flex: 1;
+      min-width: 240px;
+    }
+
+    .caption-tag {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--gold);
+      background: rgba(247, 228, 121, 0.08);
+      padding: 4px 8px;
+      border: 1px solid rgba(247, 228, 121, 0.2) !important;
+      white-space: nowrap;
+    }
+
+    /* Секция Фичи */
+    .section {
+      padding: 60px 0;
     }
 
     .features-grid {
@@ -264,23 +413,19 @@
       gap: 14px;
     }
 
-    @media (max-width: 768px) {
-      .features-grid {
-        grid-template-columns: 1fr;
-      }
-    }
-
     .feature-card {
       background: var(--card);
       backdrop-filter: blur(24px);
       -webkit-backdrop-filter: blur(24px);
-      padding: 26px 24px;
-      transition: background 0.2s ease, transform 0.2s ease;
+      border: 1px solid var(--card-border) !important;
+      padding: 24px 22px;
+      transition: background-color 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
     }
 
     .feature-card:hover {
       background: var(--card-hover);
-      transform: translateY(-2px);
+      border-color: var(--card-hover-border) !important;
+      box-shadow: 0 0 20px rgba(247, 228, 121, 0.04);
     }
 
     .feature-name {
@@ -296,13 +441,48 @@
 
     .feature-name i {
       color: var(--gold);
-      font-size: 16px;
+      font-size: 18px;
     }
 
     .feature-desc {
       font-size: 13px;
-      line-height: 1.5;
+      line-height: 1.55;
       color: var(--muted);
+    }
+
+    /* Блок расширения */
+    .extension-box {
+      background: linear-gradient(135deg, rgba(20, 20, 26, 0.9), rgba(12, 12, 16, 0.9));
+      border: 1px solid rgba(247, 228, 121, 0.2) !important;
+      padding: 34px 30px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 24px;
+      flex-wrap: wrap;
+      margin-top: 20px;
+    }
+
+    .extension-info h3 {
+      font-family: var(--font-display);
+      font-size: 20px;
+      font-weight: 700;
+      color: var(--white);
+      margin-bottom: 8px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .extension-info h3 i {
+      color: var(--gold);
+    }
+
+    .extension-info p {
+      font-size: 13px;
+      line-height: 1.6;
+      color: var(--muted);
+      max-width: 620px;
     }
 
     /* Скачать */
@@ -310,6 +490,7 @@
       background: var(--card);
       backdrop-filter: blur(24px);
       -webkit-backdrop-filter: blur(24px);
+      border: 1px solid var(--card-border) !important;
       padding: 36px 32px;
       display: flex;
       justify-content: space-between;
@@ -336,12 +517,13 @@
       background: var(--card);
       backdrop-filter: blur(24px);
       -webkit-backdrop-filter: blur(24px);
+      border: 1px solid var(--card-border) !important;
       padding: 32px 30px;
     }
 
     .about-box p {
       font-size: 14px;
-      line-height: 1.6;
+      line-height: 1.65;
       color: var(--muted);
       margin-bottom: 14px;
     }
@@ -360,6 +542,7 @@
       background: var(--card);
       backdrop-filter: blur(24px);
       -webkit-backdrop-filter: blur(24px);
+      border: 1px solid var(--card-border) !important;
       padding: 36px 32px;
       display: flex;
       justify-content: space-between;
@@ -392,13 +575,211 @@
 
     /* Футер */
     footer {
-      padding: 50px 0;
+      padding: 45px 0;
       text-align: center;
+      border-top: 1px solid rgba(255, 255, 255, 0.05) !important;
     }
 
     .footer-text {
       font-size: 12px;
       color: var(--dim);
+    }
+
+    /* ==========================================================================
+       АДАПТИВНЫЕ МЕДИА-ЗАПРОСЫ (RESPONSIVE DESIGN)
+       ========================================================================== */
+
+    /* Планшеты (max-width: 992px) */
+    @media (max-width: 992px) {
+      .features-grid {
+        grid-template-columns: repeat(2, 1fr);
+      }
+
+      .container {
+        padding: 0 24px;
+      }
+    }
+
+    /* Мобильные экраны и узкие планшеты (max-width: 768px) */
+    @media (max-width: 768px) {
+      .container {
+        padding: 0 20px;
+      }
+
+      /* Мобильная навигация */
+      .mobile-menu-btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+      }
+
+      .nav-links {
+        display: none;
+        position: absolute;
+        top: 70px;
+        left: -20px;
+        right: -20px;
+        background: rgba(10, 10, 14, 0.98);
+        backdrop-filter: blur(28px);
+        -webkit-backdrop-filter: blur(28px);
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0;
+        padding: 12px 20px 20px;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.1) !important;
+        box-shadow: 0 20px 40px rgba(0, 0, 0, 0.8);
+      }
+
+      .nav-links.open {
+        display: flex;
+      }
+
+      .nav-link {
+        width: 100%;
+        padding: 14px 0;
+        font-size: 14px;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.05) !important;
+      }
+
+      /* Hero на мобильных */
+      .hero {
+        padding: 48px 0 35px;
+      }
+
+      .hero-title {
+        font-size: 32px;
+        margin-bottom: 16px;
+      }
+
+      .hero-desc {
+        font-size: 14px;
+        line-height: 1.55;
+        margin-bottom: 26px;
+      }
+
+      .hero-actions {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 12px;
+      }
+
+      .btn-main,
+      .btn-text {
+        width: 100%;
+        justify-content: center;
+        padding: 14px 20px;
+        text-align: center;
+      }
+
+      /* Showcase / Галерея на мобильных */
+      .showcase-section {
+        padding: 10px 0 45px;
+      }
+
+      .showcase-header {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 14px;
+      }
+
+      .showcase-tabs {
+        width: 100%;
+        overflow-x: auto;
+        flex-wrap: nowrap;
+        -webkit-overflow-scrolling: touch;
+        scrollbar-width: none;
+        padding: 4px;
+      }
+
+      .showcase-tabs::-webkit-scrollbar {
+        display: none;
+      }
+
+      .tab-btn {
+        flex-shrink: 0;
+        padding: 8px 12px;
+        font-size: 11px;
+      }
+
+      .showcase-image-wrap {
+        min-height: 200px;
+      }
+
+      .showcase-caption {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 8px;
+        padding: 12px 14px;
+      }
+
+      .caption-text {
+        font-size: 12px;
+        min-width: 100%;
+      }
+
+      /* Фичи на 1 колонку */
+      .section {
+        padding: 40px 0;
+      }
+
+      .section-title {
+        font-size: 22px;
+        margin-bottom: 18px;
+      }
+
+      .features-grid {
+        grid-template-columns: 1fr;
+        gap: 12px;
+      }
+
+      .feature-card {
+        padding: 20px 18px;
+      }
+
+      /* Блоки призыва к действию (Extension, Download, Support) */
+      .extension-box,
+      .download-box,
+      .support-box {
+        padding: 24px 20px;
+        flex-direction: column;
+        align-items: stretch;
+        gap: 18px;
+      }
+
+      .extension-info h3,
+      .download-info h3,
+      .support-heading {
+        font-size: 18px;
+      }
+
+      .extension-box .btn-main,
+      .download-box .btn-main,
+      .support-box .btn-main {
+        width: 100%;
+        justify-content: center;
+      }
+    }
+
+    /* Узкие смартфоны (max-width: 480px) */
+    @media (max-width: 480px) {
+      .container {
+        padding: 0 16px;
+      }
+
+      .nav-links {
+        left: -16px;
+        right: -16px;
+        padding: 12px 16px 20px;
+      }
+
+      .hero-title {
+        font-size: 28px;
+      }
+
+
+      .about-box {
+        padding: 22px 18px;
+      }
     }
   </style>
 </head>
@@ -408,7 +789,7 @@
   <!-- Мягкое фоновое свечение (Blur) -->
   <div class="ambient-glow"></div>
 
-  <!-- Шапка: лого, название, навигация: фичи, скачать, об проекте -->
+  <!-- Шапка -->
   <header>
     <div class="container">
       <div class="nav-inner">
@@ -417,8 +798,15 @@
           <span class="brand-title">freakcloud</span>
         </a>
 
-        <nav class="nav-links">
+        <!-- Мобильная кнопка меню -->
+        <button class="mobile-menu-btn" id="mobileMenuBtn" aria-label="Открыть меню">
+          <i class="ri-menu-line" id="mobileMenuIcon"></i>
+        </button>
+
+        <nav class="nav-links" id="navLinks">
+          <a href="#screens" class="nav-link">Скриншоты</a>
           <a href="#features" class="nav-link">Фичи</a>
+          <a href="#extension" class="nav-link">Расширение</a>
           <a href="#download" class="nav-link">Скачать</a>
           <a href="#about" class="nav-link">О проекте</a>
         </nav>
@@ -427,93 +815,194 @@
   </header>
 
   <main class="container">
-    <!-- Описание -->
-    <section class="hero animate-cascade">
+    <!-- Описание / Hero -->
+    <section class="hero">
       <h1 class="hero-title">
         Слушайте SoundCloud.<br><span>Без тормозов и рекламы.</span>
       </h1>
       <p class="hero-desc">
-        Быстрый и чистый плеер на рабочий стол. Не жрет память в отличие от вкладок браузера, моментально стартует,
-        плавно переключает треки и умеет играть музыку офлайн.
+        Ультралегковесный плеер на Rust и Tauri v2. Потребляет в 15–20 раз меньше памяти, чем вкладки браузера, моментально стартует, визуализирует ваши вкусы в 2D-графе и сохраняет треки для прослушивания офлайн.
       </p>
       <div class="hero-actions">
         <a href="#download" class="btn-main">
           <i class="ri-download-2-line"></i>
           <span>Скачать для Windows</span>
         </a>
-        <a href="https://github.com/MinakowDev/freakcloud" target="_blank" rel="noreferrer" class="btn-text">
-          <span>GitHub</span>
-          <i class="ri-arrow-right-line"></i>
+        <a href="#screens" class="btn-text">
+          <i class="ri-image-line"></i>
+          <span>Галерея интерфейса</span>
         </a>
+        <a href="https://github.com/MinakowDev/freakcloud" target="_blank" rel="noreferrer" class="btn-text">
+          <i class="ri-github-fill"></i>
+          <span>GitHub</span>
+        </a>
+      </div>
+    </section>
+
+    <!-- Интерактивная витрина скриншотов -->
+    <section class="showcase-section" id="screens">
+      <div class="showcase-header">
+        <div>
+          <h2 class="section-title">Интерфейс приложения</h2>
+        </div>
+        <div class="showcase-tabs" id="screenTabs">
+          <button class="tab-btn active" data-img="assets/main_page.png" data-caption="Главная страница: интерактивный физический граф музыкальных вкусов, персональная станция и быстрые рекомендации" data-tag="Главный экран">
+            <i class="ri-home-5-line"></i> Главная
+          </button>
+          <button class="tab-btn" data-img="assets/taste_tree.png" data-caption="Граф вкусов: интерактивная 2D-физика ваших музыкальных предпочтений, связи артистов, микрожанры и инспектор вкуса" data-tag="Граф вкусов">
+            <i class="ri-bubble-chart-line"></i> Граф вкусов
+          </button>
+          <button class="tab-btn" data-img="assets/search_page.png" data-caption="Умный поиск: мгновенный поиск треков, авторов и альбомов в SoundCloud с подсказками" data-tag="Поиск">
+            <i class="ri-search-2-line"></i> Поиск
+          </button>
+          <button class="tab-btn" data-img="assets/artist_page.png" data-caption="Карточка артиста: детальная дискография, топовые релизы, похожие авторы и прямое добавление в плейлисты" data-tag="Артисты">
+            <i class="ri-user-voice-line"></i> Артист
+          </button>
+          <button class="tab-btn" data-img="assets/media_my_saved_tracks.png" data-caption="Сохранённые треки: офлайн-коллекция, мгновенный доступ без ожидания буферизации сети" data-tag="Медиатека">
+            <i class="ri-download-cloud-2-line"></i> Офлайн кэш
+          </button>
+          <button class="tab-btn" data-img="assets/media_my_likes.png" data-caption="Любимые треки и плейлисты: создание пользовательских коллекций с динамическими 2x2 коллажами обложек" data-tag="Плейлисты">
+            <i class="ri-heart-3-line"></i> Мои лайки
+          </button>
+        </div>
+      </div>
+
+      <div class="showcase-display">
+        <div class="showcase-toolbar">
+          <div class="window-dots">
+            <span class="window-dot"></span>
+            <span class="window-dot"></span>
+            <span class="window-dot"></span>
+          </div>
+          <span class="window-title" id="showcaseWindowTitle">freakcloud — Desktop Preview</span>
+          <div style="width: 40px;"></div>
+        </div>
+
+        <div class="showcase-image-wrap">
+          <img id="showcaseImg" src="assets/main_page.png" alt="Скриншот freakcloud" class="showcase-img" />
+        </div>
+
+        <div class="showcase-caption">
+          <span class="caption-text" id="showcaseCaption">
+            Главная страница: интерактивный физический граф музыкальных вкусов, персональная станция и быстрые рекомендации
+          </span>
+          <span class="caption-tag" id="showcaseTag">Главный экран</span>
+        </div>
       </div>
     </section>
 
     <!-- Фичи -->
     <section class="section" id="features">
-      <h2 class="section-title">Фичи</h2>
+      <h2 class="section-title" style="margin-bottom: 24px;">Возможности плеера</h2>
 
       <div class="features-grid">
         <div class="feature-card">
           <h3 class="feature-name">
-            <i class="ri-flashlight-line"></i>
-            Ест ~38 МБ памяти
+            <i class="ri-cpu-line"></i>
+            Ест ~40 МБ памяти
           </h3>
           <p class="feature-desc">
-            Не грузит систему и игры. Никаких тяжелых браузеров в фоне — плеер открывается мгновенно и работает
-            бесшумно.
+            Написан на Rust (Tauri v2) с асинхронным Tokio-ядром. Не жрёт гигабайты оперативки как браузерные вкладки или Electron, мгновенно стартует и не нагружает игры.
+          </p>
+        </div>
+
+        <div class="feature-card">
+          <h3 class="feature-name">
+            <i class="ri-bubble-chart-line"></i>
+            Интерактивный граф вкусов 2.0
+          </h3>
+          <p class="feature-desc">
+            2D-физика предпочтений в стиле студийного CAD: визуализация связей артистов, зум, панорамирование, кластеризация микрожанров и алгоритм Energy Sleep (0.0% CPU в простое).
           </p>
         </div>
 
         <div class="feature-card">
           <h3 class="feature-name">
             <i class="ri-radar-line"></i>
-            Бесконечный поток
+            Бесконечный умный поток
           </h3>
           <p class="feature-desc">
-            Умная волна SoundCloud Stations. Музыка естественно перетекает из трека в трек по реальным вкусам
-            слушателей.
+            Симбиоз SoundCloud Stations и локальной модели вкусов (учет дослушиваний, штрафы за скипы, 3.0x буст лайков). Автоматически подгружает новые порции треков заранее.
           </p>
         </div>
 
         <div class="feature-card">
           <h3 class="feature-name">
-            <i class="ri-heart-pulse-line"></i>
-            Умный подбор под вас
+            <i class="ri-history-line"></i>
+            Очередь с историей треков
           </h3>
           <p class="feature-desc">
-            Плеер запоминает, что вы слушаете до конца, и больше предлагает похожего. Частые скипы убирают трек из
-            выдачи.
+            Удобная прозрачная очередь с историей «Ранее прослушанные». Легко вернуться к любому треку из прошлого прослушивания в один клик без сбоя текущего потока.
+          </p>
+        </div>
+
+        <div class="feature-card">
+          <h3 class="feature-name">
+            <i class="ri-play-list-2-line"></i>
+            Свои плейлисты и медиатека
+          </h3>
+          <p class="feature-desc">
+            6 разделов медиатеки с пружинной навигацией, кастомные плейлисты с авто-коллажами 2x2, локальное кэширование карточек артистов и альбомов без повторных запросов к API.
           </p>
         </div>
 
         <div class="feature-card">
           <h3 class="feature-name">
             <i class="ri-download-cloud-line"></i>
-            Музыка без интернета
+            Офлайн кэш на диске
           </h3>
           <p class="feature-desc">
-            Кэширует треки прямо на диск. Любимую музыку можно слушать без задержек сети и даже когда пропал интернет.
+            Сохраняет любимую музыку прямо на локальный диск. Мгновенный запуск без ожидания буферизации и возможность слушать треки даже без интернета.
           </p>
         </div>
 
         <div class="feature-card">
           <h3 class="feature-name">
             <i class="ri-equalizer-line"></i>
-            Плавные переходы
+            Студийный кроссфейд
           </h3>
           <p class="feature-desc">
-            Звук мягко переходит между треками как в Spotify. Никакой внезапной тишины или щелчков в наушниках.
+            Бесшовный переход между треками с мягким логарифмическим нарастанием громкости. Никакой резкой тишины, щелчков или обрывов звучания.
+          </p>
+        </div>
+
+        <div class="feature-card">
+          <h3 class="feature-name">
+            <i class="ri-discord-fill"></i>
+            Discord Rich Presence
+          </h3>
+          <p class="feature-desc">
+            Транслирует играющий трек, имя исполнителя, обложку и таймлайн воспроизведения прямо в ваш статус профиля Discord.
           </p>
         </div>
 
         <div class="feature-card">
           <h3 class="feature-name">
             <i class="ri-layout-bottom-line"></i>
-            Прячется в трей
+            Интеграция с системным треем
           </h3>
           <p class="feature-desc">
-            Сворачивается рядом с часами и не занимает панель задач. Управлять треками можно не открывая главное окно.
+            Сворачивается рядом с часами Windows. Управление воспроизведением через контекстное меню и мини-виджет без необходимости держать окно открытым.
           </p>
+        </div>
+      </div>
+
+      <!-- Расширение -->
+      <div class="extension-box" id="extension">
+        <div class="extension-info">
+          <h3>
+            <i class="ri-shield-keyhole-line"></i>
+            Моментальный вход через браузерное расширение
+          </h3>
+          <p>
+            SoundCloud защищен сложной WAF-капчей DataDome, которая блокирует обычные бот-логины. Мы разработали компаньон-расширение <strong>freakcloud-extension</strong>: просто войдите в SoundCloud в браузере — расширение автоматически передаст авторизацию в ваш локальный плеер в 1 клик.
+          </p>
+        </div>
+        <div>
+          <a href="https://github.com/MinakowDev/freakcloud-extension" target="_blank" rel="noreferrer" class="btn-main">
+            <i class="ri-external-link-line"></i>
+            <span>freakcloud-extension</span>
+          </a>
         </div>
       </div>
     </section>
@@ -525,12 +1014,12 @@
       <div class="download-box">
         <div class="download-info">
           <h3>freakcloud для Windows</h3>
-          <p>Готовые сборки и обновления на GitHub Releases</p>
+          <p>Официальные бинарные сборки и установщики на GitHub Releases</p>
         </div>
         <div>
           <a href="https://github.com/MinakowDev/freakcloud/releases" target="_blank" rel="noreferrer" class="btn-main">
             <i class="ri-windows-fill"></i>
-            <span>Скачать релиз</span>
+            <span>Скачать релиз (.exe / .msi)</span>
           </a>
         </div>
       </div>
@@ -542,11 +1031,10 @@
 
       <div class="about-box">
         <p>
-          <strong>freakcloud</strong> — бесплатный плеер с открытым исходным кодом. Он создан для тех, кто слушает
-          SoundCloud каждый день, но устал от тяжелых вкладок браузера, пожирающих гигабайты оперативки.
+          <strong>freakcloud</strong> — полностью бесплатный плеер с открытым исходным кодом. Он создан для тех, кто слушает SoundCloud каждый день, но устал от тяжёлых браузеров, утечек памяти и навязчивых баннеров.
         </p>
         <p>
-          Все ваши лайки, история прослушиваний и настройки хранятся только у вас на компьютере.
+          Все ваши лайки, история прослушиваний, офлайн-кэш и настройки хранятся строго локально на вашем компьютере. Никакой телеметрии и рекламы.
         </p>
       </div>
     </section>
@@ -560,7 +1048,7 @@
             Понравился плеер?
           </h3>
           <p class="support-desc">
-            Поставьте звездочку на GitHub — это помогает проекту развиваться и вдохновляет делать freakcloud еще лучше.
+            Поставьте звёздочку репозиторию на GitHub — это помогает проекту развиваться, привлекает новых контрибьюторов и вдохновляет делать freakcloud ещё лучше.
           </p>
         </div>
         <div>
@@ -577,10 +1065,64 @@
   <footer>
     <div class="container">
       <div class="footer-text">
-        freakcloud • MIT License
+        freakcloud • Built with Rust & Tauri v2 • MIT License
       </div>
     </div>
   </footer>
+
+  <!-- Скрипты: интерактивное переключение скриншотов + мобильное меню -->
+  <script>
+    (function () {
+      // 1. Переключение скриншотов
+      const tabs = document.querySelectorAll('#screenTabs .tab-btn');
+      const img = document.getElementById('showcaseImg');
+      const caption = document.getElementById('showcaseCaption');
+      const tag = document.getElementById('showcaseTag');
+
+      tabs.forEach(btn => {
+        btn.addEventListener('click', () => {
+          tabs.forEach(t => t.classList.remove('active'));
+          btn.classList.add('active');
+
+          const newSrc = btn.getAttribute('data-img');
+          const newCaption = btn.getAttribute('data-caption');
+          const newTag = btn.getAttribute('data-tag');
+
+          img.style.opacity = '0.3';
+          setTimeout(() => {
+            img.src = newSrc;
+            caption.textContent = newCaption;
+            tag.textContent = newTag;
+            img.style.opacity = '1';
+          }, 120);
+        });
+      });
+
+      // 2. Мобильное меню (бургер)
+      const menuBtn = document.getElementById('mobileMenuBtn');
+      const menuIcon = document.getElementById('mobileMenuIcon');
+      const navLinks = document.getElementById('navLinks');
+
+      if (menuBtn && navLinks) {
+        menuBtn.addEventListener('click', () => {
+          const isOpen = navLinks.classList.toggle('open');
+          if (menuIcon) {
+            menuIcon.className = isOpen ? 'ri-close-line' : 'ri-menu-line';
+          }
+        });
+
+        // Закрываем меню при клике по любой ссылке
+        navLinks.querySelectorAll('.nav-link').forEach(link => {
+          link.addEventListener('click', () => {
+            navLinks.classList.remove('open');
+            if (menuIcon) {
+              menuIcon.className = 'ri-menu-line';
+            }
+          });
+        });
+      }
+    })();
+  </script>
 
 </body>
 

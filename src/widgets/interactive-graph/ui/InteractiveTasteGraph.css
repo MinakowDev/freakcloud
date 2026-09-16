@@ -179,17 +179,18 @@
 }
 
 .itg-inspector__stat-value {
-  font-size: 12px;
-  font-weight: 700;
+  font-size: 13px;
+  font-weight: 800;
   color: #ffffff;
   font-family: ui-monospace, SFMono-Regular, monospace;
 }
 
 .itg-inspector__stat-label {
-  font-size: 8px;
-  color: #71717a;
+  font-size: 9px;
+  font-weight: 700;
+  color: #a1a1aa;
   text-transform: uppercase;
-  letter-spacing: 0.5px;
+  letter-spacing: 0.6px;
   font-family: ui-monospace, SFMono-Regular, monospace;
 }
 
