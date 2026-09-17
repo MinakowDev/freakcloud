@@ -32,16 +32,9 @@
 
 ## Benchmark: freakcloud vs The Rest
 
-Unlike heavy Electron wrappers or browser tabs that eat 1+ GB of memory and stutter games, freakcloud runs on a compiled **Rust (Tokio)** core with a native OS webview.
-
-```text
-RAM Usage during Playback (Lower is better)
-──────────────────────────────────────────────────────────────────────────
-Chrome Tab (SoundCloud)   ██████████████████████████████████ 850 MB
-Electron Players          ████████████████████ 520 MB
-freakcloud (Rust + Tauri) ██ 50 MB  (up to 17x lighter)
-──────────────────────────────────────────────────────────────────────────
-```
+<p align="center">
+  <img src="docs/assets/benchmark.svg" alt="freakcloud performance benchmark" width="850" />
+</p>
 
 ### Architectural Comparison
 
