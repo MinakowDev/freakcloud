@@ -1,0 +1,641 @@
+/* Дизайн-система freakcloud: Dark Industrial Neumorphism / Soft UI */
+:root {
+  --bg: #09090b;
+  --neu-bg-raised: linear-gradient(145deg, #151519, #0a0a0c);
+  --neu-bg-hover: linear-gradient(145deg, #18181d, #0d0d10);
+  --neu-border: rgba(255, 255, 255, 0.06);
+  --neu-border-hover: rgba(255, 255, 255, 0.14);
+  --neu-shadow-raised: -4px -4px 12px rgba(255, 255, 255, 0.035), 5px 7px 18px rgba(0, 0, 0, 0.7);
+  --neu-shadow-hover: -6px -6px 16px rgba(255, 255, 255, 0.06), 7px 12px 26px rgba(0, 0, 0, 0.85);
+  --neu-shadow-inset: inset 2px 2px 6px rgba(0, 0, 0, 0.75), inset -1px -1px 4px rgba(255, 255, 255, 0.02);
+
+  --gold: #f7e479;
+  --gold-dim: rgba(247, 228, 121, 0.08);
+
+  --zinc-800: #27272a;
+  --zinc-700: #3f3f46;
+  --zinc-500: #71717a;
+  --zinc-400: #a1a1aa;
+  --zinc-300: #d4d4d8;
+  --white: #ffffff;
+
+  --font-display: 'Outfit', sans-serif;
+  --font-body: 'Plus Jakarta Sans', -apple-system, sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  outline: none !important;
+  -webkit-tap-highlight-color: transparent;
+}
+
+html {
+  scroll-behavior: smooth;
+  background-color: var(--bg);
+}
+
+body {
+  background-color: var(--bg);
+  color: var(--white);
+  font-family: var(--font-body);
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;
+  min-height: 100vh;
+  position: relative;
+}
+
+.container {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 0 24px;
+  position: relative;
+  z-index: 2;
+}
+
+/* Neumorphic Card */
+.neu-card {
+  background: var(--neu-bg-raised);
+  border: 1px solid var(--neu-border);
+  box-shadow: var(--neu-shadow-raised);
+  border-radius: 1rem;
+  transition: box-shadow 0.2s ease, border-color 0.2s ease, background 0.2s ease;
+}
+
+/* Hover статичен по геометрии */
+.neu-card:hover {
+  background: var(--neu-bg-hover);
+  border-color: var(--neu-border-hover);
+  box-shadow: var(--neu-shadow-hover);
+}
+
+/* Recessed Container */
+.neu-inset {
+  background: #09090b;
+  box-shadow: var(--neu-shadow-inset);
+  border: 1px solid rgba(0, 0, 0, 0.6);
+  border-radius: 0.75rem;
+}
+
+/* Кнопки */
+.neu-btn-primary {
+  background: #ffffff;
+  color: #000000;
+  box-shadow: -2px -2px 8px rgba(255, 255, 255, 0.15), 4px 6px 16px rgba(0, 0, 0, 0.8);
+  border-radius: 8px;
+  font-family: var(--font-body);
+  font-size: 13px;
+  font-weight: 700;
+  padding: 10px 22px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  text-decoration: none;
+  cursor: pointer;
+  border: 1px solid transparent;
+  transition: background-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.neu-btn-primary:hover {
+  background: #f4f4f5;
+  box-shadow: -3px -3px 12px rgba(255, 255, 255, 0.25), 5px 8px 20px rgba(0, 0, 0, 0.9);
+}
+
+.neu-btn-secondary {
+  background: linear-gradient(145deg, #18181c, #0d0d10);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: -2px -2px 8px rgba(255, 255, 255, 0.04), 3px 4px 10px rgba(0, 0, 0, 0.6);
+  border-radius: 8px;
+  color: var(--white);
+  font-family: var(--font-body);
+  font-size: 13px;
+  font-weight: 600;
+  padding: 10px 20px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  text-decoration: none;
+  cursor: pointer;
+  transition: background 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease, color 0.2s ease;
+}
+
+.neu-btn-secondary:hover {
+  background: linear-gradient(145deg, #222228, #111115);
+  border-color: rgba(255, 255, 255, 0.16);
+  color: var(--gold);
+}
+
+/* Навигация */
+header {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  background: #09090b;
+  border-bottom: 1px solid var(--neu-border);
+}
+
+.nav-inner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 60px;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  text-decoration: none;
+  color: var(--white);
+}
+
+.brand-logo {
+  width: 22px;
+  height: 22px;
+  object-fit: contain;
+  display: block;
+}
+
+.brand-title {
+  font-family: var(--font-display);
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: var(--zinc-200);
+}
+
+.nav-links {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+}
+
+.nav-link {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--zinc-400);
+  text-decoration: none;
+  padding: 6px 0;
+  transition: color 0.15s ease;
+}
+
+.nav-link:hover {
+  color: var(--white);
+}
+
+.gh-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  background: #ffffff;
+  color: #000000;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 700;
+  text-decoration: none;
+  transition: background-color 0.15s ease;
+}
+
+.gh-btn:hover {
+  background: #e4e4e7;
+}
+
+.mobile-menu-btn {
+  display: none;
+  background: var(--neu-bg-raised);
+  color: var(--white);
+  font-size: 18px;
+  cursor: pointer;
+  padding: 7px 10px;
+  border: 1px solid var(--neu-border);
+  border-radius: 8px;
+}
+
+/* Hero */
+.hero {
+  padding: 65px 0 45px;
+}
+
+.hero-title {
+  font-family: var(--font-display);
+  font-size: clamp(32px, 5vw, 52px);
+  font-weight: 800;
+  line-height: 1.12;
+  letter-spacing: -0.03em;
+  color: var(--white);
+  margin-bottom: 16px;
+  max-width: 800px;
+}
+
+.hero-title span {
+  color: var(--zinc-500);
+}
+
+.hero-desc {
+  font-size: 15px;
+  line-height: 1.6;
+  color: var(--zinc-400);
+  max-width: 620px;
+  margin-bottom: 28px;
+}
+
+.hero-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+/* Секции */
+.section-wrap {
+  padding: 40px 0;
+}
+
+.section-header {
+  margin-bottom: 18px;
+}
+
+.section-title {
+  font-family: var(--font-display);
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--white);
+}
+
+.section-sub {
+  font-size: 13px;
+  color: var(--zinc-400);
+  margin-top: 4px;
+}
+
+/* Витрина скриншотов */
+.showcase-header {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.showcase-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  background: #09090b;
+  padding: 4px;
+  border-radius: 8px;
+  border: 1px solid var(--neu-border);
+  box-shadow: var(--neu-shadow-inset);
+}
+
+.tab-btn {
+  background: transparent;
+  color: var(--zinc-400);
+  font-family: var(--font-body);
+  font-size: 12px;
+  font-weight: 600;
+  padding: 6px 14px;
+  border-radius: 6px;
+  cursor: pointer;
+  border: 1px solid transparent;
+  transition: background 0.2s ease, color 0.2s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+
+.tab-btn:hover {
+  color: var(--white);
+}
+
+.tab-btn.active {
+  background: linear-gradient(145deg, #1d1d22, #101014);
+  color: var(--gold);
+  border-color: rgba(247, 228, 121, 0.3);
+}
+
+.app-window-frame {
+  border-radius: 1rem;
+  overflow: hidden;
+  border: 1px solid var(--neu-border);
+  box-shadow: var(--neu-shadow-raised);
+  background: #09090b;
+}
+
+.showcase-image-wrap {
+  width: 100%;
+  background: #060608;
+  min-height: 400px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px;
+}
+
+.showcase-img {
+  width: 100%;
+  height: auto;
+  max-height: 640px;
+  object-fit: contain;
+  display: block;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.04);
+  transition: opacity 0.18s ease;
+}
+
+.showcase-caption {
+  padding: 12px 18px;
+  background: #0c0c0e;
+  border-top: 1px solid var(--neu-border);
+}
+
+.caption-text {
+  font-size: 13px;
+  color: var(--zinc-400);
+}
+
+/* Компактный блок замеров */
+.benchmark-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+}
+
+.stat-card {
+  padding: 22px 20px;
+  display: flex;
+  flex-direction: column;
+}
+
+.stat-val {
+  font-family: var(--font-display);
+  font-size: 32px;
+  font-weight: 800;
+  color: var(--gold);
+  line-height: 1;
+  margin-bottom: 8px;
+}
+
+.stat-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--white);
+  margin-bottom: 4px;
+}
+
+.stat-desc {
+  font-size: 12.5px;
+  color: var(--zinc-400);
+  line-height: 1.45;
+}
+
+/* Возможности (6 карточек) */
+.features-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+}
+
+.feature-card {
+  padding: 22px 20px;
+}
+
+.feature-icon-box {
+  width: 40px;
+  height: 40px;
+  border-radius: 8px;
+  background: #09090b;
+  box-shadow: var(--neu-shadow-inset);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 12px;
+  color: var(--gold);
+  font-size: 19px;
+}
+
+.feature-name {
+  font-family: var(--font-display);
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--white);
+  margin-bottom: 6px;
+}
+
+.feature-desc {
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--zinc-400);
+}
+
+/* Блок расширения */
+.extension-box {
+  padding: 26px 24px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  flex-wrap: wrap;
+  margin-top: 20px;
+  border-color: rgba(247, 228, 121, 0.25);
+}
+
+.extension-info {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  max-width: 650px;
+}
+
+.extension-icon {
+  width: 44px;
+  height: 44px;
+  border-radius: 8px;
+  background: #09090b;
+  box-shadow: var(--neu-shadow-inset);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--gold);
+  font-size: 20px;
+  flex-shrink: 0;
+}
+
+.extension-info h3 {
+  font-family: var(--font-display);
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--white);
+  margin-bottom: 3px;
+}
+
+.extension-info p {
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--zinc-400);
+}
+
+/* Скачать */
+.download-box {
+  padding: 30px 26px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 20px;
+  flex-wrap: wrap;
+}
+
+.download-info h3 {
+  font-family: var(--font-display);
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--white);
+  margin-bottom: 4px;
+}
+
+.download-info p {
+  font-size: 13px;
+  color: var(--zinc-400);
+}
+
+.download-buttons {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+/* Футер */
+footer {
+  padding: 36px 0;
+  text-align: center;
+  border-top: 1px solid var(--neu-border);
+  margin-top: 20px;
+}
+
+.footer-text {
+  font-size: 12px;
+  font-family: var(--font-body);
+  color: var(--zinc-500);
+}
+
+/* Адаптив */
+@media (max-width: 992px) {
+  .benchmark-grid,
+  .features-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 768px) {
+  .container {
+    padding: 0 16px;
+  }
+
+  .mobile-menu-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .nav-links {
+    display: none;
+    position: absolute;
+    top: 60px;
+    left: -16px;
+    right: -16px;
+    background: #09090b;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0;
+    padding: 12px 20px 20px;
+    border-bottom: 1px solid var(--neu-border);
+  }
+
+  .nav-links.open {
+    display: flex;
+  }
+
+  .nav-link {
+    width: 100%;
+    padding: 12px 0;
+    font-size: 14px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+  }
+
+  .hero {
+    padding: 40px 0 20px;
+  }
+
+  .hero-title {
+    font-size: 28px;
+    margin-bottom: 12px;
+  }
+
+  .hero-desc {
+    font-size: 13.5px;
+    margin-bottom: 20px;
+  }
+
+  .hero-actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .neu-btn-primary,
+  .neu-btn-secondary {
+    width: 100%;
+    justify-content: center;
+    text-align: center;
+  }
+
+  .showcase-header {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .showcase-tabs {
+    overflow-x: auto;
+    flex-wrap: nowrap;
+    scrollbar-width: none;
+  }
+
+  .showcase-tabs::-webkit-scrollbar {
+    display: none;
+  }
+
+  .showcase-image-wrap {
+    min-height: 200px;
+  }
+
+  .benchmark-grid,
+  .features-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .extension-box,
+  .download-box {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .download-buttons {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .download-buttons a {
+    width: 100%;
+    justify-content: center;
+  }
+}
