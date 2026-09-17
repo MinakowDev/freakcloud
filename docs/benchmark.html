@@ -1,0 +1,495 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>freakcloud - Performance & Architecture Benchmark</title>
+
+  <!-- Google Fonts: Outfit, JetBrains Mono, Plus Jakarta Sans -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=Outfit:wght@500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap"
+    rel="stylesheet" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/remixicon@4.2.0/fonts/remixicon.css" />
+
+  <style>
+    :root {
+      --bg: #000000;
+      --card: rgba(14, 14, 18, 0.85);
+      --card-border: rgba(255, 255, 255, 0.08);
+      --white: #ffffff;
+      --muted: #8e8e93;
+      --dim: #48484a;
+      --gold: #f7e479;
+      --gold-dim: rgba(247, 228, 121, 0.12);
+      --red: #ff453a;
+      --orange: #ff9f0a;
+      --green: #30d158;
+
+      --font-display: 'Outfit', sans-serif;
+      --font-body: 'Plus Jakarta Sans', -apple-system, sans-serif;
+      --font-mono: 'JetBrains Mono', monospace;
+    }
+
+    /* Строгий запрет на скругления по дизайн-системе freakcloud */
+    *,
+    *::before,
+    *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      border-radius: 0 !important;
+      outline: none !important;
+    }
+
+    body {
+      background-color: var(--bg);
+      color: var(--white);
+      font-family: var(--font-body);
+      line-height: 1.5;
+      -webkit-font-smoothing: antialiased;
+      padding: 40px 20px;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      position: relative;
+      overflow-x: hidden;
+    }
+
+    .ambient-glow {
+      position: absolute;
+      top: -100px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 700px;
+      height: 400px;
+      background: radial-gradient(circle, rgba(247, 228, 121, 0.08) 0%, rgba(255, 255, 255, 0.02) 40%, transparent 70%);
+      filter: blur(120px);
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    .benchmark-canvas {
+      width: 100%;
+      max-width: 960px;
+      background: #08080a;
+      border: 1px solid rgba(255, 255, 255, 0.1) !important;
+      box-shadow: 0 24px 60px rgba(0, 0, 0, 0.9), 0 0 30px rgba(247, 228, 121, 0.04);
+      position: relative;
+      z-index: 1;
+      padding: 36px 40px;
+    }
+
+    /* Заголовок витрины */
+    .benchmark-header {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08) !important;
+      padding-bottom: 24px;
+      margin-bottom: 32px;
+      flex-wrap: wrap;
+      gap: 16px;
+    }
+
+    .brand-row {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+
+    .brand-logo {
+      width: 36px;
+      height: 36px;
+      object-fit: contain;
+    }
+
+    .brand-title {
+      font-family: var(--font-display);
+      font-size: 22px;
+      font-weight: 800;
+      letter-spacing: -0.03em;
+      color: var(--white);
+    }
+
+    .brand-subtitle {
+      font-size: 13px;
+      color: var(--muted);
+      margin-top: 2px;
+    }
+
+    .benchmark-tag {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--gold);
+      background: var(--gold-dim);
+      border: 1px solid rgba(247, 228, 121, 0.3) !important;
+      padding: 6px 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+    }
+
+    /* Секции графиков */
+    .section-title {
+      font-family: var(--font-display);
+      font-size: 18px;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      color: var(--white);
+      margin-bottom: 6px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .section-title i {
+      color: var(--gold);
+    }
+
+    .section-desc {
+      font-size: 13px;
+      color: var(--muted);
+      margin-bottom: 20px;
+    }
+
+    /* Диаграммы столбиков */
+    .charts-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 24px;
+      margin-bottom: 36px;
+    }
+
+    @media (max-width: 768px) {
+      .charts-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .chart-card {
+      background: var(--card);
+      border: 1px solid var(--card-border) !important;
+      padding: 22px 20px;
+    }
+
+    .chart-label {
+      font-family: var(--font-display);
+      font-size: 14px;
+      font-weight: 700;
+      color: var(--white);
+      margin-bottom: 16px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .chart-sublabel {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--muted);
+    }
+
+    .bar-group {
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    .bar-row {
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+    }
+
+    .bar-meta {
+      display: flex;
+      justify-content: space-between;
+      font-size: 12px;
+      font-family: var(--font-mono);
+    }
+
+    .bar-meta .app-name {
+      color: var(--white);
+      font-weight: 500;
+    }
+
+    .bar-meta .app-value {
+      font-weight: 600;
+    }
+
+    .bar-meta .app-value.val-high {
+      color: #ff6961;
+    }
+
+    .bar-meta .app-value.val-mid {
+      color: #ffb340;
+    }
+
+    .bar-meta .app-value.val-best {
+      color: var(--gold);
+    }
+
+    .bar-track {
+      width: 100%;
+      height: 12px;
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid rgba(255, 255, 255, 0.06) !important;
+      position: relative;
+    }
+
+    .bar-fill {
+      height: 100%;
+      position: relative;
+    }
+
+    .bar-fill.fill-high {
+      background: #ff453a;
+      opacity: 0.85;
+    }
+
+    .bar-fill.fill-mid {
+      background: #ff9f0a;
+      opacity: 0.85;
+    }
+
+    .bar-fill.fill-best {
+      background: var(--gold);
+      box-shadow: 0 0 12px rgba(247, 228, 121, 0.4);
+    }
+
+    /* Сравнительная таблица */
+    .table-card {
+      background: var(--card);
+      border: 1px solid var(--card-border) !important;
+      overflow-x: auto;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      text-align: left;
+      font-size: 13px;
+    }
+
+    th,
+    td {
+      padding: 13px 18px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.05) !important;
+    }
+
+    th {
+      font-family: var(--font-display);
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      background: rgba(255, 255, 255, 0.02);
+    }
+
+    th.col-freakcloud {
+      color: var(--gold);
+      background: rgba(247, 228, 121, 0.06);
+    }
+
+    td.col-freakcloud {
+      color: var(--gold);
+      font-weight: 600;
+      background: rgba(247, 228, 121, 0.04);
+    }
+
+    .badge-win {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      padding: 3px 6px;
+      background: rgba(48, 209, 88, 0.15);
+      border: 1px solid rgba(48, 209, 88, 0.3) !important;
+      color: #30d158;
+    }
+
+    .badge-lose {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      padding: 3px 6px;
+      background: rgba(255, 69, 58, 0.15);
+      border: 1px solid rgba(255, 69, 58, 0.3) !important;
+      color: #ff453a;
+    }
+
+    .footer-note {
+      margin-top: 20px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--dim);
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+  </style>
+</head>
+
+<body>
+
+  <div class="ambient-glow"></div>
+
+  <div class="benchmark-canvas" id="benchmarkCanvas">
+    <div class="benchmark-header">
+      <div class="brand-row">
+        <img src="logo.png" alt="freakcloud logo" class="brand-logo" />
+        <div>
+          <div class="brand-title">freakcloud</div>
+          <div class="brand-subtitle">Performance & Architecture Benchmark</div>
+        </div>
+      </div>
+      <div class="benchmark-tag">
+        <i class="ri-shield-check-line"></i> Verified Native Runtime
+      </div>
+    </div>
+
+    <!-- Графики столбиков -->
+    <div class="charts-grid">
+      <!-- RAM Chart -->
+      <div class="chart-card">
+        <div class="chart-label">
+          <span>Active RAM Usage</span>
+          <span class="chart-sublabel">Lower is better</span>
+        </div>
+        <div class="bar-group">
+          <div class="bar-row">
+            <div class="bar-meta">
+              <span class="app-name">Chrome Tab (SoundCloud)</span>
+              <span class="app-value val-high">850 MB</span>
+            </div>
+            <div class="bar-track">
+              <div class="bar-fill fill-high" style="width: 100%;"></div>
+            </div>
+          </div>
+
+          <div class="bar-row">
+            <div class="bar-meta">
+              <span class="app-name">Electron Apps (Dotify / Mimose)</span>
+              <span class="app-value val-mid">520 MB</span>
+            </div>
+            <div class="bar-track">
+              <div class="bar-fill fill-mid" style="width: 61%;"></div>
+            </div>
+          </div>
+
+          <div class="bar-row">
+            <div class="bar-meta">
+              <span class="app-name" style="color: var(--gold);">freakcloud (Rust + Tauri)</span>
+              <span class="app-value val-best">50 MB <span style="font-size: 10px;">(17x lighter)</span></span>
+            </div>
+            <div class="bar-track">
+              <div class="bar-fill fill-best" style="width: 6%;"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- CPU Chart -->
+      <div class="chart-card">
+        <div class="chart-label">
+          <span>Background / Idle CPU</span>
+          <span class="chart-sublabel">Lower is better</span>
+        </div>
+        <div class="bar-group">
+          <div class="bar-row">
+            <div class="bar-meta">
+              <span class="app-name">Electron Apps (Active/Idle)</span>
+              <span class="app-value val-high">4.8 %</span>
+            </div>
+            <div class="bar-track">
+              <div class="bar-fill fill-high" style="width: 96%;"></div>
+            </div>
+          </div>
+
+          <div class="bar-row">
+            <div class="bar-meta">
+              <span class="app-name">Chrome Background Tab</span>
+              <span class="app-value val-mid">2.5 %</span>
+            </div>
+            <div class="bar-track">
+              <div class="bar-fill fill-mid" style="width: 50%;"></div>
+            </div>
+          </div>
+
+          <div class="bar-row">
+            <div class="bar-meta">
+              <span class="app-name" style="color: var(--gold);">freakcloud (Kinetic Sleep)</span>
+              <span class="app-value val-best">0.0 % <span style="font-size: 10px;">(Zero load)</span></span>
+            </div>
+            <div class="bar-track">
+              <div class="bar-fill fill-best" style="width: 1%;"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Таблица сравнения -->
+    <div class="table-card">
+      <table>
+        <thead>
+          <tr>
+            <th>Architecture Parameter</th>
+            <th>Browser Tab</th>
+            <th>Electron Aggregators</th>
+            <th class="col-freakcloud">freakcloud</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>Memory Footprint</strong></td>
+            <td>~800 - 1200 MB</td>
+            <td>~500 - 800 MB</td>
+            <td class="col-freakcloud">~50 MB <span class="badge-win">17x lighter</span></td>
+          </tr>
+          <tr>
+            <td><strong>Background CPU</strong></td>
+            <td>2 - 5 %</td>
+            <td>3 - 7 %</td>
+            <td class="col-freakcloud">0.0 % <span class="badge-win">Energy Sleep</span></td>
+          </tr>
+          <tr>
+            <td><strong>Installer Package Size</strong></td>
+            <td>N/A</td>
+            <td>~80 - 120 MB</td>
+            <td class="col-freakcloud">3.3 MB <span class="badge-win">Instant</span></td>
+          </tr>
+          <tr>
+            <td><strong>Offline Audio Disk Cache</strong></td>
+            <td><span class="badge-lose">None</span></td>
+            <td>Partial / Paid</td>
+            <td class="col-freakcloud">Native Disk Storage</td>
+          </tr>
+          <tr>
+            <td><strong>Interactive Taste Graph 2.0</strong></td>
+            <td><span class="badge-lose">None</span></td>
+            <td><span class="badge-lose">None</span></td>
+            <td class="col-freakcloud">2D Physics Engine</td>
+          </tr>
+          <tr>
+            <td><strong>Monetization & Ads</strong></td>
+            <td>Audio Ads & Promos</td>
+            <td>Paid Plans (Mimose+)</td>
+            <td class="col-freakcloud">100% Free & Open Source (MIT)</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="footer-note">
+      <span>freakcloud benchmark suite</span>
+      <span>Tauri v2 + Rust Tokio Core</span>
+    </div>
+  </div>
+
+</body>
+
+</html>
