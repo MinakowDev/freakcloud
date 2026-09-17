@@ -1,181 +1,136 @@
-# freakcloud ☁️⚡
+# freakcloud
 
 <p align="center">
-  <img src="public/logo.png" alt="freakcloud logo" width="96" height="96" />
+  <img src="public/logo.png" alt="freakcloud logo" width="80" height="80" />
 </p>
 
 <p align="center">
-  <strong>The ultra-lightweight, high-performance desktop music player for SoundCloud.</strong><br>
-  Быстрый и невесомый десктопный плеер для SoundCloud на Rust и Tauri v2.
+  <strong>Ultra-lightweight, zero-bloat desktop player for SoundCloud.</strong><br>
+  Built with Rust and Tauri v2. Runs on ~50 MB RAM with 0.0% idle CPU.
 </p>
 
 <p align="center">
-  <a href="#-english">English</a> • <a href="#-русский">Русский</a>
-</p>
-
-<p align="center">
-  <img src="https://img.shields.io/badge/Tauri-v2-blue?style=flat-square&logo=tauri" alt="Tauri">
+  <a href="https://github.com/MinakowDev/freakcloud/releases/latest"><img src="https://img.shields.io/github/v/release/MinakowDev/freakcloud?style=flat-square&color=white" alt="Release"></a>
+  <img src="https://img.shields.io/badge/Tauri-v2-blue?style=flat-square&logo=tauri" alt="Tauri v2">
   <img src="https://img.shields.io/badge/Rust-Tokio-orange?style=flat-square&logo=rust" alt="Rust">
-  <img src="https://img.shields.io/badge/RAM-~40MB-success?style=flat-square" alt="Lightweight RAM">
-  <img src="https://img.shields.io/badge/React-18-61dafb?style=flat-square&logo=react" alt="React">
-  <img src="https://img.shields.io/badge/TypeScript-Strict-3178c6?style=flat-square&logo=typescript" alt="TypeScript">
+  <img src="https://img.shields.io/badge/RAM-~50MB-success?style=flat-square" alt="RAM ~50MB">
   <img src="https://img.shields.io/badge/License-MIT-lightgrey?style=flat-square" alt="License">
 </p>
 
 <p align="center">
-  <code>soundcloud</code> • <code>music-player</code> • <code>desktop</code> • <code>tauri</code> • <code>rust</code> • <code>react</code> • <code>typescript</code> • <code>offline-cache</code> • <code>audio-crossfade</code> • <code>taste-graph</code> • <code>discord-rpc</code> • <code>lightweight</code>
+  <a href="https://github.com/MinakowDev/freakcloud/releases/latest">Download Release (.exe / .msi)</a> •
+  <a href="https://minakowdev.github.io/freakcloud/">Website & Screenshots</a> •
+  <a href="https://github.com/MinakowDev/freakcloud-extension">Browser Extension</a> •
+  <a href="#-русский">Русский</a>
 </p>
-
-> [!TIP]
-> **⚡ Quick 1-Click Authorization / Авторизация в один клик**  
-> Connect your SoundCloud account instantly without manual token copying using our companion browser extension:  
-> Мгновенный вход в свой аккаунт SoundCloud без ручного ввода токенов через наше браузерное расширение:  
-> 👉 **[freakcloud-extension](https://github.com/MinakowDev/freakcloud-extension)**
 
 <p align="center">
-  <img src="docs/assets/main_page.png" alt="freakcloud UI preview" width="850" />
+  <img src="docs/assets/main_page.png" alt="freakcloud Desktop Preview" width="880" />
 </p>
 
 ---
 
-<h2 id="english">🇬🇧 English</h2>
+## Benchmark: freakcloud vs The Rest
 
-### ⚡ Why freakcloud?
+Unlike heavy Electron wrappers or browser tabs that eat 1+ GB of memory and stutter games, freakcloud runs on a compiled **Rust (Tokio)** core with a native OS webview.
 
-SoundCloud in a browser tab or Electron wrapper burns **500 MB – 1.5 GB of RAM**, lags background games, and drains battery life. 
+```text
+RAM Usage during Playback (Lower is better)
+──────────────────────────────────────────────────────────────────────────
+Chrome Tab (SoundCloud)   ██████████████████████████████████ 850 MB
+Electron Players          ████████████████████ 520 MB
+freakcloud (Rust + Tauri) ██ 50 MB  (up to 17x lighter)
+──────────────────────────────────────────────────────────────────────────
+```
 
-**freakcloud** re-engineers the experience with **Rust** and **Tauri v2**:
-- **Consumes ~40 MB RAM** — up to 20x lighter than web tabs or Electron apps.
-- **Near-zero CPU usage** — runs silently in the background without affecting your FPS or workflow.
-- **Instant cold start** — launches in milliseconds using your system's native webview.
+### Architectural Comparison
+
+| Metric / Feature | Browser Tab (Chrome) | Electron Aggregators (Dotify / Mimose) | **freakcloud** |
+| :--- | :---: | :---: | :---: |
+| **Active Memory (RAM)** | ~800–1200 MB | ~500–800 MB | **~50 MB** *(11 MB private)* |
+| **Idle CPU Usage** | 2–5% | 3–7% | **0.0%** *(Kinetic Sleep)* |
+| **Installer Size** | — | ~80–120 MB | **3.3 MB** |
+| **Audio Engine** | Web Audio API | Chromium / Node | **Native Tokio Loopback** |
+| **Offline Disk Cache** | ❌ None | ⚠️ Limited / Paid | **✅ Local disk storage** |
+| **Taste Graph 2.0** | ❌ None | ❌ None | **✅ 2D Physics Engine** |
+| **Monetization** | Ads | Paid plans ($ / Mimose+) | **100% Free & Open Source (MIT)** |
 
 ---
 
-### ✨ Key Features
+## Overview
 
-- **🌊 Intelligent Infinite Stream**: Powered by SoundCloud Stations and tuned to your habits. The more you listen, the better the mix. Automatically queues upcoming tracks so the music never stops.
-- **💾 Offline Playback**: Cache favorite tracks directly to disk. Enjoy instant playback with zero buffering, even when your internet goes down.
-- **🔁 Queue with History**: Jump straight back to songs you listened to earlier with a single click, without breaking your current queue.
-- **📁 Playlists & Unified Library**: Create and edit custom playlists with instant SoundCloud track search, dynamic cover collages, and organized views for your likes, albums, and artists.
-- **🌐 Interactive Taste Graph**: Real-time 2D visualization of your music taste. Explore how your favorite artists and genres connect, boost or mute influences, and see your listening stats.
-- **🎧 Studio-Grade Crossfade**: Seamless transitions between tracks with smooth logarithmic volume ramping — no sudden silence or harsh cuts.
-- **🎮 Discord Rich Presence**: Show off what you are playing in Discord with live track titles, artist names, album art, and elapsed time.
-- **📌 System Tray Mini-Control**: Tuck freakcloud into your taskbar tray. Control playback anytime without keeping the main window open.
+| Feature | Description |
+| :--- | :--- |
+| **Smart Infinite Wave** | Infinite music flow based on SoundCloud Stations, tuned to your listen-throughs and likes. |
+| **Offline Cache** | Downloads favorite tracks to your local disk for instant, zero-buffering playback without internet. |
+| **Queue with History** | Rewind to previously played tracks in one click without resetting your current radio stream. |
+| **Taste Graph 2.0** | Studio 2D physics map of your musical preferences with artist clusters and zero-CPU sleep mode. |
+| **Custom Playlists** | Organize tracks with dynamic 2x2 cover collages and instant SoundCloud in-app search. |
+| **Studio Crossfade** | Seamless logarithmic volume ramping between tracks with no silence or clicks. |
+| **Discord RPC & Tray** | Live playback status in Discord and a background system tray mini-controller. |
 
 ---
 
-### 🔑 1-Click SoundCloud Authorization
+## Instant 1-Click Login
 
-SoundCloud uses DataDome WAF protections that block automated desktop logins. To sign in effortlessly:
+SoundCloud blocks automated desktop sign-ins via DataDome WAF. Log in effortlessly with our companion extension:
 
-👉 **[freakcloud Sync Extension (GitHub)](https://github.com/MinakowDev/freakcloud-extension)**
+👉 **[freakcloud Sync Extension](https://github.com/MinakowDev/freakcloud-extension)**
 
-1. Install the extension in any Chromium browser (Chrome, Edge, Brave).
+1. Install the extension in Chrome, Edge, Brave, or Yandex.
 2. Log into [soundcloud.com](https://soundcloud.com).
-3. The extension securely transfers your session directly to the desktop app via `127.0.0.1:49281`.
+3. The extension detects your session and securely connects your desktop player in 1 click.
 
 ---
 
-### 🛠 Tech Stack
-
-- **Frontend**: React 18, TypeScript, Vite, Vanilla CSS tokens, Remix Icon.
-- **Backend**: Tauri v2, Rust, Tokio, Reqwest, Hyper (Loopback Audio Server), Discord RPC.
-- **Architecture**: Modular Feature-Sliced Design (`entities`, `widgets`, `shared`, `pages`) + Clean Architecture in Rust.
-
----
-
-### 🚀 Getting Started
-
-#### Prerequisites
-- [Rust](https://www.rust-lang.org/) (latest stable)
-- [Bun](https://bun.sh/) or [Node.js](https://nodejs.org/) (v18+)
+## Quick Start
 
 ```bash
-# Clone the repository
+# Clone repository
 git clone https://github.com/MinakowDev/freakcloud.git
 cd freakcloud/freakcloud
 
-# Install frontend dependencies
+# Install dependencies & run dev server
 bun install
-
-# Run in development mode
 bun tauri dev
 
-# Build production executable (.exe / .msi)
+# Build release executable
 bun tauri build
 ```
 
 ---
 
-<h2 id="russian">🇷🇺 Русский</h2>
+<h2 id="-русский">🇷🇺 Русский</h2>
 
-### ⚡ Почему freakcloud?
+### Почему freakcloud?
 
-SoundCloud во вкладке браузера или Electron-обертке отъедает **от 500 МБ до 1.5 ГБ оперативной памяти**, нагружает систему в играх и тратит заряд батареи.
+Вкладка SoundCloud в браузере или плеер на базе Electron отъедает **до 1 ГБ оперативной памяти**, нагружает процессор и просаживает FPS в играх. 
 
-**freakcloud** создан на **Rust** и **Tauri v2** для максимальной скорости и легкости:
-- **Потребляет всего ~40 МБ ОЗУ** — в 15–20 раз легче браузера или Electron.
-- **Нулевая фоновая нагрузка** — музыка играет в фоне, не просаживая FPS в играх и не замедляя работу.
-- **Мгновенный старт** — плеер открывается за доли секунды благодаря нативному системному Webview.
+**freakcloud** написан на **Rust** с нативным ядром **Tauri v2**:
+- **~50 МБ ОЗУ** вместо 800+ МБ у браузера;
+- **0.0% CPU в простое** благодаря алгоритму Kinetic Energy Sleep;
+- **Размер инсталлятора — всего 3.3 МБ**;
+- **100% Free & Open Source (MIT)**: без рекламы, платных подписок и тяжелого Electron.
 
----
+### Быстрое сравнение
 
-### ✨ Главные возможности
+| Возможность | Обычный браузер | Electron-комбайны | **freakcloud** |
+| :--- | :---: | :---: | :---: |
+| **ОЗУ в фоне** | 800+ МБ | 500–800 МБ | **~50 МБ** |
+| **Нагрузка CPU** | 2–5% | 3–7% | **0.0%** |
+| **Офлайн-кэш** | ❌ Нет | ⚠️ Платный / баги | **✅ На локальный диск** |
+| **Граф вкусов** | ❌ Нет | ❌ Нет | **✅ 2D-симуляция вкусов** |
+| **Управление** | Вкладка | Окно | **Трей Windows + Discord RPC** |
 
-- **🌊 Умный бесконечный поток**: Персональная волна на основе станций SoundCloud, адаптированная под ваши вкусы. Музыка играет непрерывно и заранее подгружает свежие треки.
-- **💾 Офлайн-кэш**: Скачивайте любимые треки на локальный диск. Музыка играет мгновенно без сетевых буферизаций и доступна даже без интернета.
-- **🔁 Очередь с историей**: Удобный возврат к любой прослушанной песне в один клик без сброса текущего плейлиста.
-- **📁 Свои плейлисты и медиатека**: Создавайте собственные плейлисты с динамическими обложками, добавляйте треки через быстрый поиск по SoundCloud, управляйте лайками, альбомами и артистами в единой библиотеке.
-- **🌐 Интерактивный Граф вкусов**: Наглядная 2D-визуализация ваших музыкальных предпочтений. Узнайте, как связаны ваши любимые жанры и артисты, усиливайте или скрывайте исполнителей.
-- **🎧 Бесшовный кроссфейд**: Плавный переход между треками с мягким затуханием и нарастанием громкости (как в Spotify).
-- **🎮 Статус в Discord**: Автоматически показывает играющий трек, автора, обложку и таймлайн в вашем профиле Discord.
-- **📌 Управление из трея**: Сворачивайте плеер рядом с часами Windows и переключайте треки, не открывая главное окно.
+### Скачать
 
----
-
-### 🔑 Вход в аккаунт в 1 клик
-
-SoundCloud защищён капчей DataDome, блокирующей прямой вход через сторонние приложения. Для моментальной авторизации:
-
-👉 **[Расширение freakcloud Sync (GitHub)](https://github.com/MinakowDev/freakcloud-extension)**
-
-1. Установите расширение в Chrome, Edge, Brave или Яндекс.Браузер.
-2. Войдите на [soundcloud.com](https://soundcloud.com).
-3. Расширение безопасно передаст авторизацию напрямую в десктопное приложение через локальный порт `127.0.0.1:49281`.
+Готовые официальные сборки доступны в [GitHub Releases](https://github.com/MinakowDev/freakcloud/releases/latest):
+- **`freakcloud_x64-setup.exe`** — установщик Windows
+- **`freakcloud_x64.msi`** — Windows Installer пакет
+- **`freakcloud_x64_portable.zip`** — портативная версия
 
 ---
 
-### 🛠 Стек технологий
+## License
 
-- **Фронтенд**: React 18, TypeScript, Vite, Vanilla CSS токены, Remix Icon.
-- **Бэкенд**: Tauri v2, Rust, Tokio, Reqwest, Hyper (Loopback Audio Server), Discord RPC.
-- **Архитектура**: Feature-Sliced Design на фронтенде + Clean Architecture в ядре Rust.
-
----
-
-### 🚀 Запуск и сборка
-
-#### Требования
-- [Rust](https://www.rust-lang.org/) (актуальная версия)
-- [Bun](https://bun.sh/) или [Node.js](https://nodejs.org/) (18+)
-
-```bash
-# Клонирование репозитория
-git clone https://github.com/MinakowDev/freakcloud.git
-cd freakcloud/freakcloud
-
-# Установка зависимостей
-bun install
-
-# Запуск в режиме разработки
-bun tauri dev
-
-# Сборка установщика для Windows (.exe / .msi)
-bun tauri build
-```
-
----
-
-## 📄 License
-
-MIT License. Designed for pure listening pleasure.
+[MIT License](LICENSE) • Built for pure listening pleasure.
