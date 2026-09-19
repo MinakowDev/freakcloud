@@ -2,7 +2,7 @@ use async_trait::async_trait;
 
 use crate::domain::{
     errors::DomainError,
-    models::{Playlist, Track, UserProfile},
+    models::{PaginatedTracks, Playlist, Track, UserProfile},
 };
 
 #[async_trait]
@@ -32,7 +32,7 @@ pub trait SoundCloudGateway: Send + Sync {
     async fn get_me(&self) -> Result<UserProfile, DomainError>;
 
     /// Получение списка понравившихся треков пользователя
-    async fn get_my_likes(&self, limit: u32) -> Result<Vec<Track>, DomainError>;
+    async fn get_my_likes(&self, limit: u32, next_href: Option<String>) -> Result<PaginatedTracks, DomainError>;
 
     /// Получение трендовых/популярных треков для главной страницы
     async fn get_trending(&self, genre: Option<&str>, limit: u32) -> Result<Vec<Track>, DomainError>;

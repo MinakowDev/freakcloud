@@ -17,6 +17,7 @@ export interface PlayerContextValue {
   queue: Track[];
   currentIndex: number;
   isQueueOpen: boolean;
+  isLyricsOpen: boolean;
   isWaveMode: boolean;
   setWaveMode: (enabled: boolean) => void;
   playTrack: (track: Track, newQueue?: Track[]) => Promise<void>;
@@ -34,6 +35,8 @@ export interface PlayerContextValue {
   removeFromQueue: (index: number) => void;
   clearQueue: () => void;
   toggleQueueOpen: () => void;
+  toggleLyricsOpen: () => void;
+  setLyricsOpen: (open: boolean) => void;
 }
 
 export const PlayerContext = createContext<PlayerContextValue | null>(null);

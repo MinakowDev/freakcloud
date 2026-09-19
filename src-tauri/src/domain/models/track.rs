@@ -16,6 +16,12 @@ pub struct Track {
     pub permalink_url: String,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct PaginatedTracks {
+    pub tracks: Vec<Track>,
+    pub next_href: Option<String>,
+}
+
 impl Track {
     pub fn formatted_duration(&self) -> String {
         let total_seconds = self.duration_ms / 1000;

@@ -5,7 +5,10 @@ use crate::{
         AuthenticateUseCase, CacheTrackUseCase, GetTrackStreamUseCase, GetTrendingUseCase,
         ManageCacheUseCase, ManagePlaylistsUseCase, SearchTracksUseCase,
     },
-    domain::ports::{AudioCacheGateway, PlaylistRepository, SessionRepository, SoundCloudGateway},
+    domain::ports::{
+        AudioCacheGateway, AudioPlayerPort, PlaylistRepository, SessionRepository,
+        SoundCloudGateway,
+    },
 };
 
 pub struct AppState {
@@ -21,6 +24,7 @@ pub struct AppState {
     pub audio_cache: Arc<dyn AudioCacheGateway>,
     pub playlist_repo: Arc<dyn PlaylistRepository>,
     pub discord_rpc: Arc<crate::infrastructure::DiscordRpcService>,
+    pub audio_player: Arc<dyn AudioPlayerPort>,
 }
 
 impl AppState {
@@ -30,6 +34,7 @@ impl AppState {
         audio_cache: Arc<dyn AudioCacheGateway>,
         playlist_repo: Arc<dyn PlaylistRepository>,
         discord_rpc: Arc<crate::infrastructure::DiscordRpcService>,
+        audio_player: Arc<dyn AudioPlayerPort>,
     ) -> Self {
         Self {
             search_tracks: SearchTracksUseCase::new(gateway.clone()),
@@ -44,6 +49,7 @@ impl AppState {
             audio_cache,
             playlist_repo,
             discord_rpc,
+            audio_player,
         }
     }
 }

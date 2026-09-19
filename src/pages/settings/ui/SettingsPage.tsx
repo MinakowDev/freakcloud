@@ -118,6 +118,12 @@ export const SettingsPage: React.FC = () => {
     setTimeout(() => setTasteMessage(null), 3000);
   };
 
+  const handleOpenLogs = async () => {
+    if (tauriApi.isTauri()) {
+      await tauriApi.openLogDir();
+    }
+  };
+
   return (
     <div className="flex flex-col gap-8 max-w-3xl w-full select-none py-4">
       <div className="flex items-center justify-between pb-3 border-b border-zinc-900/80">
@@ -502,6 +508,28 @@ export const SettingsPage: React.FC = () => {
           {metadataMessage && (
             <span className="text-xs text-emerald-400 font-mono">{metadataMessage}</span>
           )}
+
+          <div className="h-[1px] w-full bg-zinc-900/60" />
+
+          {/* Logs & Diagnostics */}
+          <div className="flex items-center justify-between">
+            <div className="flex flex-col gap-0.5">
+              <span className="text-sm font-semibold text-white">
+                {t('settings.logs_title')}
+              </span>
+              <span className="text-xs text-zinc-400">
+                {t('settings.logs_desc')}
+              </span>
+            </div>
+
+            <button
+              type="button"
+              onClick={handleOpenLogs}
+              className="neu-button px-3.5 py-1.5 rounded-xl text-zinc-300 hover:text-white text-xs font-semibold"
+            >
+              {t('settings.open_logs_btn')}
+            </button>
+          </div>
         </div>
       </section>
 

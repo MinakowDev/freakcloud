@@ -38,8 +38,11 @@ interface LikesContextValue {
   // 2. SoundCloud account tracks ("SoundCloud")
   soundCloudTracks: Track[];
   isLoadingSoundCloud: boolean;
+  isLoadingMoreSoundCloud: boolean;
+  hasMoreSoundCloud: boolean;
   soundCloudError: string | null;
   refreshSoundCloud: () => Promise<void>;
+  loadMoreSoundCloud: () => Promise<void>;
 
   // Backward-compatibility aliases
   isLoading: boolean;
@@ -56,9 +59,11 @@ export const LikesProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const [likedTracks, setLikedTracks] = useState<Track[]>(() => loadStoredMyLikes());
   const [likedIds, setLikedIds] = useState<Set<number>>(() => new Set(loadStoredMyLikes().map((t) => t.id)));
 
-  // SoundCloud account collection
+  // SoundCloud account collection with pagination
   const [soundCloudTracks, setSoundCloudTracks] = useState<Track[]>([]);
+  const [soundCloudNextHref, setSoundCloudNextHref] = useState<string | null>(null);
   const [isLoadingSoundCloud, setIsLoadingSoundCloud] = useState<boolean>(false);
+  const [isLoadingMoreSoundCloud, setIsLoadingMoreSoundCloud] = useState<boolean>(false);
   const [soundCloudError, setSoundCloudError] = useState<string | null>(null);
 
   const likedIdsRef = useRef<Set<number>>(likedIds);
@@ -70,13 +75,15 @@ export const LikesProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const refreshSoundCloud = useCallback(async () => {
     if (!session.is_authenticated) {
       setSoundCloudTracks([]);
+      setSoundCloudNextHref(null);
       return;
     }
     try {
       setIsLoadingSoundCloud(true);
       setSoundCloudError(null);
-      const tracks = await tauriApi.getMyLikes(50);
-      setSoundCloudTracks(tracks);
+      const res = await tauriApi.getMyLikes(50, null);
+      setSoundCloudTracks(res.tracks);
+      setSoundCloudNextHref(res.next_href);
     } catch (err) {
       console.warn('[LikesContext] Failed to load SoundCloud likes:', err);
       setSoundCloudError(err instanceof Error ? err.message : String(err));
@@ -84,6 +91,27 @@ export const LikesProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       setIsLoadingSoundCloud(false);
     }
   }, [session.is_authenticated]);
+
+  // Load next page of SoundCloud likes
+  const loadMoreSoundCloud = useCallback(async () => {
+    if (!session.is_authenticated || isLoadingMoreSoundCloud || !soundCloudNextHref) {
+      return;
+    }
+    try {
+      setIsLoadingMoreSoundCloud(true);
+      const res = await tauriApi.getMyLikes(50, soundCloudNextHref);
+      setSoundCloudTracks((prev) => {
+        const existingIds = new Set(prev.map((t) => t.id));
+        const newUnique = res.tracks.filter((t) => !existingIds.has(t.id));
+        return [...prev, ...newUnique];
+      });
+      setSoundCloudNextHref(res.next_href);
+    } catch (err) {
+      console.warn('[LikesContext] Failed to load more SoundCloud likes:', err);
+    } finally {
+      setIsLoadingMoreSoundCloud(false);
+    }
+  }, [session.is_authenticated, isLoadingMoreSoundCloud, soundCloudNextHref]);
 
   useEffect(() => {
     refreshSoundCloud();
@@ -165,8 +193,11 @@ export const LikesProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         toggleLike,
         soundCloudTracks,
         isLoadingSoundCloud,
+        isLoadingMoreSoundCloud,
+        hasMoreSoundCloud: Boolean(soundCloudNextHref),
         soundCloudError,
         refreshSoundCloud,
+        loadMoreSoundCloud,
         isLoading: isLoadingSoundCloud,
         error: soundCloudError,
         refreshLikes: refreshSoundCloud,

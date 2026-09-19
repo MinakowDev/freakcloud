@@ -28,6 +28,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const [currentIndex, setCurrentIndex] = useState<number>(-1);
   const [audioSource, setAudioSource] = useState<AudioSource | null>(null);
   const [isQueueOpen, setIsQueueOpen] = useState(false);
+  const [isLyricsOpen, setIsLyricsOpen] = useState(false);
   const [isWaveMode, setWaveMode] = useState(false);
 
   const engineRef = useRef<AudioEngine | null>(null);
@@ -116,7 +117,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
   // Actions
   const handleNextTrack = useMemo(() => {
-    return (withCrossfade = false) => {
+    return () => {
       const q = queueRef.current;
       if (q.length === 0) return;
 
@@ -153,7 +154,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
       const nextItem = q[nextIdx];
       if (nextItem) {
-        playTrackInternal(nextItem, q, nextIdx, withCrossfade);
+        playTrackInternal(nextItem, q, nextIdx);
       }
     };
   }, []);
@@ -230,7 +231,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
       const prevItem = q[prevIdx];
       if (prevItem) {
-        playTrackInternal(prevItem, q, prevIdx, false);
+        playTrackInternal(prevItem, q, prevIdx);
       }
     };
   }, []);
@@ -275,10 +276,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
           const durSec = durationRef.current > 0 ? durationRef.current : (track.duration_ms || 180000) / 1000;
           recordTrackListen(track, durSec, durSec);
         }
-        handleNextTrack(false);
-      },
-      onApproachingEnd: () => {
-        handleNextTrack(true);
+        handleNextTrack();
       },
     });
 
@@ -329,7 +327,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
               togglePlayPause();
               break;
             case 'next':
-              handleNextTrack(false);
+              handleNextTrack();
               break;
             case 'previous':
               handlePrevTrack();
@@ -428,7 +426,8 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         try {
           let userLikes: Track[] = [];
           try {
-            userLikes = await tauriApi.getMyLikes(50);
+            const res = await tauriApi.getMyLikes(50);
+            userLikes = res?.tracks || [];
           } catch {
             // Ignore if guest or network error
           }
@@ -457,8 +456,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const playTrackInternal = async (
     track: Track,
     queueList?: Track[],
-    index?: number,
-    enableCrossfade = false
+    index?: number
   ) => {
     try {
       if (currentTrackRef.current && currentTrackRef.current.id !== track.id) {
@@ -482,8 +480,8 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       const source = await tauriApi.getTrackStream(track.id);
       setAudioSource(source);
 
-      const playableUrl = tauriApi.resolveAudioUrl(source);
-      await engineRef.current?.load(playableUrl, true, enableCrossfade);
+      const playableUrl = source.is_local && source.file_path ? source.file_path : source.url;
+      await engineRef.current?.load(playableUrl, source.is_local);
     } catch (err) {
       console.error('Failed to play track:', err);
       setIsBuffering(false);
@@ -501,7 +499,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     } else if (currentIndexRef.current >= 0) {
       shuffleHistoryRef.current.push(currentIndexRef.current);
     }
-    await playTrackInternal(track, newQueue || (queue.length > 0 ? queue : [track]), undefined, false);
+    await playTrackInternal(track, newQueue || (queue.length > 0 ? queue : [track]), undefined);
   };
 
   const playTrackAtIndex = async (idx: number) => {
@@ -512,7 +510,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     if (currentIndexRef.current >= 0 && currentIndexRef.current !== idx) {
       shuffleHistoryRef.current.push(currentIndexRef.current);
     }
-    await playTrackInternal(target, q, idx, false);
+    await playTrackInternal(target, q, idx);
   };
 
   const togglePlayPause = () => {
@@ -616,6 +614,35 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     setIsQueueOpen((prev) => !prev);
   };
 
+  const toggleLyricsOpen = useCallback(() => {
+    setIsLyricsOpen((prev) => !prev);
+  }, []);
+
+  const setLyricsOpen = useCallback((open: boolean) => {
+    setIsLyricsOpen(open);
+  }, []);
+
+  // Global 'L' hotkey for lyrics toggle
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const activeEl = document.activeElement;
+      const isInput =
+        activeEl &&
+        (activeEl.tagName === 'INPUT' ||
+          activeEl.tagName === 'TEXTAREA' ||
+          (activeEl as HTMLElement).isContentEditable);
+
+      if (isInput) return;
+
+      if ((e.key === 'l' || e.key === 'L' || e.key === 'д' || e.key === 'Д') && !e.ctrlKey && !e.metaKey && !e.altKey) {
+        toggleLyricsOpen();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [toggleLyricsOpen]);
+
   const value: PlayerContextValue = {
     currentTrack,
     isPlaying,
@@ -630,12 +657,13 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     queue,
     currentIndex,
     isQueueOpen,
+    isLyricsOpen,
     isWaveMode,
     setWaveMode,
     playTrack,
     playTrackAtIndex,
     togglePlayPause,
-    nextTrack: () => handleNextTrack(false),
+    nextTrack: handleNextTrack,
     previousTrack: handlePrevTrack,
     seekTo,
     setVolume,
@@ -647,6 +675,8 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     removeFromQueue,
     clearQueue,
     toggleQueueOpen,
+    toggleLyricsOpen,
+    setLyricsOpen,
   };
 
   return <PlayerContext.Provider value={value}>{children}</PlayerContext.Provider>;

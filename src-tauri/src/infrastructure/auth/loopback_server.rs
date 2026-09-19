@@ -10,12 +10,12 @@ pub async fn start_loopback_server(app: AppHandle) {
     let listener = match TcpListener::bind(&addr).await {
         Ok(l) => l,
         Err(e) => {
-            eprintln!("[Loopback] Failed to bind to {}: {}", addr, e);
+            log::error!("[Loopback] Failed to bind to {}: {}", addr, e);
             return;
         }
     };
 
-    println!("[Loopback] Listening for browser auth on http://{}", addr);
+    log::info!("[Loopback] Listening for browser auth on http://{}", addr);
 
     loop {
         let (mut socket, _) = match listener.accept().await {

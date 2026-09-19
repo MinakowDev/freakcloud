@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { useCache } from '../../../entities/track/model/cache-context';
 import { useLikes } from '../../../entities/track/model/likes-context';
 import { useSession } from '../../../entities/session/model/session-context';
@@ -22,8 +22,11 @@ export const LibraryPage: React.FC = () => {
     likedTracks,
     soundCloudTracks,
     isLoadingSoundCloud,
+    isLoadingMoreSoundCloud,
+    hasMoreSoundCloud,
     soundCloudError,
     refreshSoundCloud,
+    loadMoreSoundCloud,
   } = useLikes();
   const { session, openOAuthModal } = useSession();
   const { savedPlaylists, isLoading: isLoadingPlaylists, refreshSavedPlaylists } = usePlaylists();
@@ -34,6 +37,28 @@ export const LibraryPage: React.FC = () => {
   const [selectedPlaylist, setSelectedPlaylist] = useState<Playlist | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+
+  // Infinite scroll sentinel ref for SoundCloud tab
+  const infiniteScrollSentinelRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    if (!hasMoreSoundCloud || isLoadingMoreSoundCloud || activeTab !== 'soundcloud') return;
+
+    const sentinel = infiniteScrollSentinelRef.current;
+    if (!sentinel) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting) {
+          loadMoreSoundCloud();
+        }
+      },
+      { rootMargin: '300px' }
+    );
+
+    observer.observe(sentinel);
+    return () => observer.disconnect();
+  }, [hasMoreSoundCloud, isLoadingMoreSoundCloud, activeTab, loadMoreSoundCloud]);
 
   // Artist section state
   const [artistSearchQuery, setArtistSearchQuery] = useState('');
@@ -289,7 +314,30 @@ export const LibraryPage: React.FC = () => {
             </button>
           </div>
         ) : (
-          <TrackTable tracks={soundCloudTracks} emptyMessage={messages.library.empty_soundcloud || messages.library.empty_likes} />
+          <div className="flex flex-col w-full">
+            <TrackTable tracks={soundCloudTracks} emptyMessage={messages.library.empty_soundcloud || messages.library.empty_likes} />
+            {hasMoreSoundCloud && (
+              <div
+                ref={infiniteScrollSentinelRef}
+                className="flex items-center justify-center py-8 text-zinc-500 gap-2"
+              >
+                {isLoadingMoreSoundCloud ? (
+                  <div className="flex items-center gap-2 text-zinc-400">
+                    <i className="ri-loader-4-line text-lg animate-spin"></i>
+                    <span className="text-xs font-medium">Загрузка ещё треков...</span>
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={loadMoreSoundCloud}
+                    className="px-4 py-2 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-zinc-400 hover:text-white text-xs font-medium border border-zinc-800 transition-colors"
+                  >
+                    Загрузить ещё ({soundCloudTracks.length} загружено)
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
         )
       ) : activeTab === 'my-likes' ? (
         /* Мои лайки: Freakcloud internal likes */
@@ -491,7 +539,7 @@ export const LibraryPage: React.FC = () => {
                 {messages.library.empty_artists_title || 'Артисты не найдены'}
               </p>
               <p className="font-body-sm text-xs max-w-sm text-zinc-500">
-                {messages.library.empty_artists_desc || 'Добавляйте понравившиеся треки в любимые или сохраняйте в кэш — их авторы появятся здесь.'}
+                {messages.library.empty_artists_desc || 'Добавляйте понравившиеся треки в любимые или сохраняйте в кэш: их авторы появятся здесь.'}
               </p>
             </div>
           ) : filteredArtists.length === 0 ? (

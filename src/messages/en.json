@@ -42,7 +42,9 @@
     "recent_tracks": "Recent Tracks",
     "empty_recent": "Your recently played tracks will appear here",
     "recommended_albums": "Recommended Albums",
-    "recommended_albums_subtitle": "Tailored to your personal music taste"
+    "recommended_albums_subtitle": "Tailored to your personal music taste",
+    "recommended_playlists": "Curated Playlists",
+    "recommended_playlists_subtitle": "Curated based on your taste and trends"
   },
   "taste_profile": {
     "title": "Your Music Taste",
@@ -168,7 +170,12 @@
     "unlike": "Unlike",
     "wave_mode": "Endless stream",
     "open_app": "Open freakcloud",
-    "close_widget": "Hide"
+    "close_widget": "Hide",
+    "lyrics": "Lyrics",
+    "expand_player": "Expand player",
+    "lyrics_not_found": "Lyrics are not available for this track yet",
+    "lyrics_sync_unavailable": "Synced lyrics unavailable, showing plain text",
+    "collapse": "Collapse"
   },
   "cache": {
     "save_offline": "Download for offline",
@@ -227,6 +234,9 @@
     "metadata_cache_desc": "In-memory cache for artist cards, albums, and search results",
     "clear_metadata_btn": "Clear Entity Cache",
     "metadata_cleared": "Entity cache cleared",
+    "logs_title": "Logs & Diagnostics",
+    "logs_desc": "System log files with automatic size-based rotation (up to 2 MB per file)",
+    "open_logs_btn": "Open logs folder",
     "shortcuts_section": "Keyboard Shortcuts",
     "shortcut_play_pause": "Play / Pause",
     "shortcut_next_prev": "Next / Previous Track",

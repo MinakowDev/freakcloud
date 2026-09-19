@@ -4,7 +4,7 @@ use crate::{
     application::AppState,
     domain::{
         errors::DomainError,
-        models::{AudioSource, CacheStats, Playlist, Session, Track},
+        models::{AudioSource, CacheStats, PaginatedTracks, Playlist, Session, Track},
     },
 };
 
@@ -47,8 +47,9 @@ pub async fn get_trending(
 pub async fn get_my_likes(
     state: State<'_, AppState>,
     limit: Option<u32>,
-) -> Result<Vec<Track>, DomainError> {
-    state.gateway.get_my_likes(limit.unwrap_or(50)).await
+    next_href: Option<String>,
+) -> Result<PaginatedTracks, DomainError> {
+    state.gateway.get_my_likes(limit.unwrap_or(50), next_href).await
 }
 
 #[tauri::command]
@@ -307,4 +308,96 @@ pub fn set_discord_client_id(
     client_id: Option<String>,
 ) {
     state.discord_rpc.set_client_id(client_id);
+}
+
+#[tauri::command]
+pub async fn player_load_and_play(
+    state: State<'_, AppState>,
+    url: String,
+    is_local: bool,
+) -> Result<(), DomainError> {
+    state.audio_player.load_and_play(url, is_local).await
+}
+
+#[tauri::command]
+pub async fn player_play(
+    state: State<'_, AppState>,
+) -> Result<(), DomainError> {
+    state.audio_player.play().await
+}
+
+#[tauri::command]
+pub async fn player_pause(
+    state: State<'_, AppState>,
+) -> Result<(), DomainError> {
+    state.audio_player.pause().await
+}
+
+#[tauri::command]
+pub async fn player_seek(
+    state: State<'_, AppState>,
+    position_seconds: f64,
+) -> Result<(), DomainError> {
+    state.audio_player.seek(position_seconds).await
+}
+
+#[tauri::command]
+pub async fn player_set_volume(
+    state: State<'_, AppState>,
+    volume: f32,
+) -> Result<(), DomainError> {
+    state.audio_player.set_volume(volume).await
+}
+
+#[tauri::command]
+pub async fn player_set_muted(
+    state: State<'_, AppState>,
+    muted: bool,
+) -> Result<(), DomainError> {
+    state.audio_player.set_muted(muted).await
+}
+
+#[tauri::command]
+pub async fn player_stop(
+    state: State<'_, AppState>,
+) -> Result<(), DomainError> {
+    state.audio_player.stop().await
+}
+
+#[tauri::command]
+pub async fn player_get_state(
+    state: State<'_, AppState>,
+) -> Result<crate::domain::ports::AudioPlayerState, DomainError> {
+    state.audio_player.get_state().await
+}
+
+#[tauri::command]
+pub fn log_frontend_error(level: String, message: String, context: Option<String>) {
+    let ctx = context.map(|c| format!(" | Context: {}", c)).unwrap_or_default();
+    match level.to_lowercase().as_str() {
+        "warn" => log::warn!("[Frontend] {}{}", message, ctx),
+        "info" => log::info!("[Frontend] {}{}", message, ctx),
+        _ => log::error!("[Frontend] {}{}", message, ctx),
+    }
+}
+
+#[tauri::command]
+pub async fn open_log_dir(app: AppHandle) -> Result<(), DomainError> {
+    use tauri_plugin_opener::OpenerExt;
+    let log_dir = app
+        .path()
+        .app_log_dir()
+        .map_err(|e| DomainError::Storage(format!("Could not get log dir: {}", e)))?;
+
+    if !log_dir.exists() {
+        std::fs::create_dir_all(&log_dir)
+            .map_err(|e| DomainError::Storage(format!("Failed to create log dir: {}", e)))?;
+    }
+
+    let path_str = log_dir.to_string_lossy().to_string();
+    app.opener()
+        .open_path(&path_str, None::<&str>)
+        .map_err(|e| DomainError::Storage(format!("Failed to open log dir: {}", e)))?;
+
+    Ok(())
 }

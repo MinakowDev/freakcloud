@@ -7,7 +7,7 @@ const LOGIN_SFX_FILES = [
   '/sfx/jevil_metamorphosis.mp3',
 ] as const;
 
-export const playRandomLoginSfx = (volume = 0.85): HTMLAudioElement | null => {
+export const playRandomLoginSfx = (volume = 0.17): HTMLAudioElement | null => {
   try {
     const randomIndex = Math.floor(Math.random() * LOGIN_SFX_FILES.length);
     const soundFile = LOGIN_SFX_FILES[randomIndex];

@@ -3,6 +3,11 @@ import type { AudioSource, CacheStats, Track } from '../../entities/track/model/
 import type { Session } from '../../entities/session/model/types';
 import type { Playlist } from '../../entities/playlist/model/types';
 
+export interface PaginatedTracks {
+  tracks: Track[];
+  next_href: string | null;
+}
+
 export const isTauri = (): boolean => {
   if (typeof window === 'undefined') return false;
   return Boolean(
@@ -86,8 +91,8 @@ export const tauriApi = {
     });
   },
 
-  getMyLikes: async (limit = 50): Promise<Track[]> => {
-    return safeInvoke<Track[]>('get_my_likes', { limit }, []);
+  getMyLikes: async (limit = 50, nextHref?: string | null): Promise<PaginatedTracks> => {
+    return safeInvoke<PaginatedTracks>('get_my_likes', { limit, nextHref: nextHref || null }, { tracks: [], next_href: null });
   },
 
   likeTrack: async (trackId: number): Promise<void> => {
@@ -201,7 +206,73 @@ export const tauriApi = {
     }
     return source.url;
   },
+
+  playerLoadAndPlay: async (url: string, isLocal: boolean): Promise<void> => {
+    return safeInvoke<void>('player_load_and_play', { url, isLocal });
+  },
+
+  playerPlay: async (): Promise<void> => {
+    return safeInvoke<void>('player_play');
+  },
+
+  playerPause: async (): Promise<void> => {
+    return safeInvoke<void>('player_pause');
+  },
+
+  playerSeek: async (positionSeconds: number): Promise<void> => {
+    return safeInvoke<void>('player_seek', { positionSeconds });
+  },
+
+  playerSetVolume: async (volume: number): Promise<void> => {
+    return safeInvoke<void>('player_set_volume', { volume });
+  },
+
+  playerSetMuted: async (muted: boolean): Promise<void> => {
+    return safeInvoke<void>('player_set_muted', { muted });
+  },
+
+  playerStop: async (): Promise<void> => {
+    return safeInvoke<void>('player_stop');
+  },
+
+  playerGetState: async (): Promise<AudioPlayerState | null> => {
+    return safeInvoke<AudioPlayerState>('player_get_state');
+  },
+
+  onPlayerTime: async (callback: (payload: { current_time: number; duration: number }) => void): Promise<(() => void) | undefined> => {
+    if (!isTauri()) return undefined;
+    const { listen } = await import('@tauri-apps/api/event');
+    return listen<{ current_time: number; duration: number }>('player:time', (e) => callback(e.payload));
+  },
+
+  onPlayerStatus: async (callback: (status: string) => void): Promise<(() => void) | undefined> => {
+    if (!isTauri()) return undefined;
+    const { listen } = await import('@tauri-apps/api/event');
+    return listen<string>('player:status', (e) => callback(e.payload));
+  },
+
+  onPlayerEnded: async (callback: () => void): Promise<(() => void) | undefined> => {
+    if (!isTauri()) return undefined;
+    const { listen } = await import('@tauri-apps/api/event');
+    return listen('player:ended', () => callback());
+  },
+
+  logFrontendError: async (level: 'error' | 'warn' | 'info', message: string, context?: string): Promise<void> => {
+    return safeInvoke<void>('log_frontend_error', { level, message, context });
+  },
+
+  openLogDir: async (): Promise<void> => {
+    return safeInvoke<void>('open_log_dir');
+  },
 };
+
+export interface AudioPlayerState {
+  status: 'playing' | 'paused' | 'stopped' | 'buffering';
+  current_time: number;
+  duration: number;
+  volume: number;
+  is_muted: boolean;
+}
 
 export interface DiscordRpcPayload {
   title: string;

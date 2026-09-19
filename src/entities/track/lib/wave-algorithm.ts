@@ -7,6 +7,11 @@ import {
   extractGenresFromTrack,
   isBlacklisted,
 } from './taste-graph';
+import {
+  extractCanonicalArtist,
+  isAggregatorOrSpamArtist,
+  cleanSearchQuery,
+} from './track-cleaner';
 
 export type WaveVibe = 'discover' | 'familiar' | 'energetic' | 'calm';
 
@@ -33,9 +38,9 @@ export function buildTasteProfile(
     knownTrackIds.add(track.id);
     const decayWeight = Math.max(0.35, Math.exp(-0.035 * index)) * weightMultiplier;
 
-    if (track.artist && track.artist.trim()) {
-      const cleanArtist = track.artist.trim();
-      artistWeights.set(cleanArtist, (artistWeights.get(cleanArtist) || 0) + decayWeight * 2.5);
+    const canonical = extractCanonicalArtist(track);
+    if (canonical && !isAggregatorOrSpamArtist(canonical)) {
+      artistWeights.set(canonical, (artistWeights.get(canonical) || 0) + decayWeight * 2.5);
     }
 
     const genres = extractGenresFromTrack(track);
@@ -95,9 +100,9 @@ function smoothShuffle(tracks: Track[]): Track[] {
   const pool = [...shuffled];
 
   while (pool.length > 0) {
-    const lastArtist = result[result.length - 1]?.artist;
+    const lastArtist = result.length > 0 ? extractCanonicalArtist(result[result.length - 1]) : undefined;
     // Try to find a track from a different artist than the last one
-    const candidateIdx = pool.findIndex((t) => t.artist !== lastArtist);
+    const candidateIdx = pool.findIndex((t) => extractCanonicalArtist(t) !== lastArtist);
 
     if (candidateIdx !== -1) {
       result.push(pool.splice(candidateIdx, 1)[0]);
@@ -155,7 +160,10 @@ export async function generatePersonalWave(
     // Strategy B: Top artist seeds from taste profile
     if (profile.topArtists.length > 0) {
       profile.topArtists.slice(0, 2).forEach((artist) => {
-        candidatePromises.push(tauriApi.searchTracks(artist, 12));
+        const query = cleanSearchQuery(artist);
+        if (query) {
+          candidatePromises.push(tauriApi.searchTracks(query, 12));
+        }
       });
     }
 
@@ -171,10 +179,11 @@ export async function generatePersonalWave(
     batches.forEach((b) => {
       if (b.status === 'fulfilled' && Array.isArray(b.value)) {
         b.value.forEach((track) => {
+          const canonical = extractCanonicalArtist(track);
           if (
             !profile.knownTrackIds.has(track.id) &&
             !seenIds.has(track.id) &&
-            !isBlacklisted(track.artist, extractGenresFromTrack(track))
+            !isBlacklisted(canonical, extractGenresFromTrack(track))
           ) {
             seenIds.add(track.id);
             discoveredTracks.push(track);
@@ -306,7 +315,10 @@ export async function generateWaveBatch(options: WaveBatchOptions): Promise<Trac
   // 3. Additional seed from top artist if needed
   if (profile.topArtists.length > 0 && candidatePromises.length < 2) {
     const randomArtist = profile.topArtists[Math.floor(Math.random() * profile.topArtists.length)];
-    candidatePromises.push(tauriApi.searchTracks(randomArtist, 10));
+    const query = cleanSearchQuery(randomArtist);
+    if (query) {
+      candidatePromises.push(tauriApi.searchTracks(query, 10));
+    }
   }
 
   // 4. Trending vibe fallback
@@ -320,10 +332,11 @@ export async function generateWaveBatch(options: WaveBatchOptions): Promise<Trac
   results.forEach((res) => {
     if (res.status === 'fulfilled' && Array.isArray(res.value)) {
       res.value.forEach((t) => {
+        const canonical = extractCanonicalArtist(t);
         if (
           !allExcluded.has(t.id) &&
           !seenInBatch.has(t.id) &&
-          !isBlacklisted(t.artist, extractGenresFromTrack(t))
+          !isBlacklisted(canonical, extractGenresFromTrack(t))
         ) {
           seenInBatch.add(t.id);
           candidates.push(t);

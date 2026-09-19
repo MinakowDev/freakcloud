@@ -20,6 +20,7 @@ export const PlayerBar: React.FC = () => {
     queue,
     currentIndex,
     isQueueOpen,
+    isLyricsOpen,
     togglePlayPause,
     nextTrack,
     previousTrack,
@@ -29,6 +30,7 @@ export const PlayerBar: React.FC = () => {
     toggleShuffle,
     toggleRepeat,
     toggleQueueOpen,
+    toggleLyricsOpen,
   } = usePlayer();
 
   const { isCached, cacheTrack, removeCachedTrack, isDownloading } = useCache();
@@ -62,11 +64,22 @@ export const PlayerBar: React.FC = () => {
     <footer className="w-full h-[72px] bg-black border-t border-zinc-800 flex-shrink-0 px-space-lg flex items-center justify-between select-none">
       {/* 1. Track Info (Left) */}
       <div className="flex items-center gap-space-md w-1/4 min-w-[200px]">
-        <div className="w-12 h-12 rounded bg-zinc-900 border border-zinc-800 flex items-center justify-center overflow-hidden flex-shrink-0">
+        <div
+          onClick={currentTrack ? toggleLyricsOpen : undefined}
+          className={`w-12 h-12 rounded bg-zinc-900 border border-zinc-800 flex items-center justify-center overflow-hidden flex-shrink-0 relative group transition-colors ${
+            currentTrack ? 'cursor-pointer hover:border-zinc-600' : ''
+          }`}
+          title={currentTrack ? messages.player.expand_player : undefined}
+        >
           {currentTrack?.artwork_url ? (
             <img src={currentTrack.artwork_url} alt="" className="w-full h-full object-cover" />
           ) : (
             <i className="ri-disc-line text-zinc-600 text-[24px]"></i>
+          )}
+          {currentTrack && (
+            <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
+              <i className="ri-arrow-up-s-line text-white text-xl"></i>
+            </div>
           )}
         </div>
         <div className="flex flex-col min-w-0">
@@ -209,6 +222,21 @@ export const PlayerBar: React.FC = () => {
 
       {/* 3. Queue & Volume (Right) */}
       <div className="flex items-center justify-end gap-3 w-1/4 min-w-[200px]">
+        {/* Lyrics toggle button */}
+        <button
+          type="button"
+          onClick={toggleLyricsOpen}
+          disabled={!currentTrack}
+          className={`w-8 h-8 rounded-lg flex items-center justify-center transition-colors disabled:opacity-40 disabled:cursor-not-allowed ${
+            isLyricsOpen
+              ? 'bg-zinc-800 text-white'
+              : 'text-zinc-400 hover:text-white hover:bg-zinc-900'
+          }`}
+          title={messages.player.lyrics}
+        >
+          <i className="ri-mic-line text-lg"></i>
+        </button>
+
         {/* Queue toggle button */}
         <button
           type="button"

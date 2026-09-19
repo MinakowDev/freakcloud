@@ -7,6 +7,7 @@ import { DynamicGreeting } from '../../../widgets/greeting/ui/DynamicGreeting';
 import { TasteVibes } from '../../../widgets/taste-vibes/ui/TasteVibes';
 import { TasteProfileCard } from '../../../widgets/taste-profile/ui/TasteProfileCard';
 import { AlbumRecommendations } from '../../../widgets/album-recommendations/ui/AlbumRecommendations';
+import { PlaylistRecommendations } from '../../../widgets/playlist-recommendations/ui/PlaylistRecommendations';
 import { SupportBanner } from '../../../widgets/support-banner/ui/SupportBanner';
 import type { PageView } from '../../../widgets/sidebar/ui/Sidebar';
 
@@ -67,7 +68,10 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate, onSelectQuery })
         </section>
       </div>
 
-      {/* 5. GitHub Support Banner */}
+      {/* 6. Curated Playlist Recommendations */}
+      <PlaylistRecommendations />
+
+      {/* 7. GitHub Support Banner */}
       <SupportBanner />
     </div>
   );

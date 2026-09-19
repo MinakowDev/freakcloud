@@ -9,7 +9,7 @@ use rsoundcloud::{
 
 use crate::domain::{
     errors::DomainError,
-    models::{Playlist, Track, UserProfile},
+    models::{PaginatedTracks, Playlist, Track, UserProfile},
     ports::SoundCloudGateway,
 };
 
@@ -25,7 +25,7 @@ impl RSoundCloudAdapter {
         let sc_client = match SoundCloudClient::new(None, auth_token.clone()).await {
             Ok(c) => Some(c),
             Err(e) => {
-                eprintln!(
+                log::warn!(
                     "SoundCloud client startup initialization deferred (offline / blocked): {:?}",
                     e
                 );
@@ -252,7 +252,7 @@ impl SoundCloudGateway for RSoundCloudAdapter {
     async fn resolve_stream_url(&self, track_id: u64) -> Result<String, DomainError> {
         self.ensure_client().await?;
 
-        // 1. Try to fetch author's original master file (320kbps / FLAC / WAV) if downloadable
+        // Ensure client_id is available for stream transcoding resolution
         if self.cached_client_id.read().await.is_none() {
             if let Ok(id) = SoundCloudClient::generate_client_id().await {
                 *self.cached_client_id.write().await = Some(id);
@@ -260,35 +260,6 @@ impl SoundCloudGateway for RSoundCloudAdapter {
         }
         let client_id = self.cached_client_id.read().await.clone().unwrap_or_default();
 
-        if !client_id.is_empty() {
-            let download_url = format!(
-                "https://api-v2.soundcloud.com/tracks/{}/download?client_id={}",
-                track_id, client_id
-            );
-            let mut dl_req = self.http.get(&download_url);
-            if let Some(token) = self.current_token.read().await.as_ref() {
-                dl_req = dl_req.header("Authorization", format!("OAuth {}", token));
-            }
-            if let Ok(dl_resp) = dl_req.send().await {
-                if dl_resp.status().is_success() {
-                    #[derive(serde::Deserialize)]
-                    struct DownloadResponse {
-                        #[serde(rename = "redirectUri")]
-                        redirect_uri: Option<String>,
-                    }
-                    if let Ok(dl_data) = dl_resp.json::<DownloadResponse>().await {
-                        if let Some(uri) = dl_data.redirect_uri {
-                            if !uri.is_empty() {
-                                println!("[Stream] Resolved author original master track (320k/Lossless): {}", track_id);
-                                return Ok(uri);
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        // 2. Otherwise fetch stream transcodings
         let sc_track = {
             let client_guard = self.client.read().await;
             let client = client_guard.as_ref().ok_or_else(|| {
@@ -301,31 +272,36 @@ impl SoundCloudGateway for RSoundCloudAdapter {
         };
 
         // Find highest quality transcoding:
-        // - HQ tier (quality == "hq", AAC 256kbps or Opus)
         // - Progressive MP3 (128 kbps)
         // - Any progressive
+        // - HQ tier (quality == "hq", AAC 256kbps or Opus)
         // - First available
         let transcodings = &sc_track.track.media.transcodings;
         let target_transcoding = transcodings
             .iter()
-            .find(|t| {
-                t.quality.as_str() == "hq"
-                    || t.format.mime_type.contains("aac")
-                    || t.format.mime_type.contains("mp4a")
-            })
+            .find(|t| t.format.protocol == "progressive" && t.format.mime_type.contains("audio/mpeg"))
+            .or_else(|| transcodings.iter().find(|t| t.format.protocol == "progressive"))
             .or_else(|| {
                 transcodings
                     .iter()
-                    .find(|t| t.format.protocol == "progressive" && t.format.mime_type.contains("audio/mpeg"))
+                    .find(|t| {
+                        t.quality.as_str() == "hq"
+                            || t.format.mime_type.contains("aac")
+                            || t.format.mime_type.contains("mp4a")
+                    })
             })
-            .or_else(|| transcodings.iter().find(|t| t.format.protocol == "progressive"))
             .or_else(|| transcodings.first())
             .ok_or_else(|| DomainError::StreamNotAvailable(track_id))?;
 
         // Resolve stream URL using client_id / auth token
-        let mut req = self.http.get(&target_transcoding.url);
-        
-        // Append client_id or authorization
+        let mut target_url = reqwest::Url::parse(&target_transcoding.url)
+            .map_err(|e| DomainError::SoundCloud(format!("Invalid stream transcoding URL: {}", e)))?;
+
+        if !client_id.is_empty() && !target_url.query_pairs().any(|(k, _)| k == "client_id") {
+            target_url.query_pairs_mut().append_pair("client_id", &client_id);
+        }
+
+        let mut req = self.http.get(target_url.as_str());
         if let Some(token) = self.current_token.read().await.as_ref() {
             req = req.header("Authorization", format!("OAuth {}", token));
         }
@@ -334,6 +310,13 @@ impl SoundCloudGateway for RSoundCloudAdapter {
             .send()
             .await
             .map_err(|e| DomainError::Network(format!("Failed to resolve stream link: {}", e)))?;
+
+        if !resp.status().is_success() {
+            return Err(DomainError::Network(format!(
+                "Failed to resolve stream link, HTTP status: {}",
+                resp.status()
+            )));
+        }
 
         #[derive(serde::Deserialize)]
         struct StreamResponse {
@@ -362,13 +345,11 @@ impl SoundCloudGateway for RSoundCloudAdapter {
         Ok(Self::map_user(&me))
     }
 
-    async fn get_my_likes(&self, limit: u32) -> Result<Vec<Track>, DomainError> {
+    async fn get_my_likes(&self, limit: u32, next_href: Option<String>) -> Result<PaginatedTracks, DomainError> {
         let token = match self.current_token.read().await.as_ref() {
             Some(t) if !t.trim().is_empty() => t.trim().to_string(),
             _ => return Err(DomainError::Unauthorized),
         };
-
-        let me = self.get_me().await?;
 
         #[derive(serde::Deserialize)]
         struct LikeUserData {
@@ -408,21 +389,30 @@ impl SoundCloudGateway for RSoundCloudAdapter {
         #[derive(serde::Deserialize)]
         struct LikesApiResponse {
             collection: Vec<LikeCollectionItem>,
+            next_href: Option<String>,
         }
 
-        let limit = if limit == 0 { 50 } else { limit };
-        let url = format!("https://api-v2.soundcloud.com/users/{}/track_likes?limit={}", me.id, limit);
+        let is_cursor_request = next_href.as_ref().map(|h| !h.trim().is_empty()).unwrap_or(false);
+        let url = if let Some(href) = next_href.filter(|h| !h.trim().is_empty()) {
+            href
+        } else {
+            let me = self.get_me().await?;
+            let limit = if limit == 0 { 50 } else { limit };
+            format!("https://api-v2.soundcloud.com/users/{}/track_likes?limit={}", me.id, limit)
+        };
 
         let resp = match self.http.get(&url).header("Authorization", format!("OAuth {}", token)).send().await {
             Ok(r) if r.status().is_success() => r,
-            _ => {
-                let fallback_url = format!("https://api-v2.soundcloud.com/me/likes/tracks?limit={}", limit);
+            _ if !is_cursor_request => {
+                let fallback_url = format!("https://api-v2.soundcloud.com/me/likes/tracks?limit={}", if limit == 0 { 50 } else { limit });
                 self.http.get(&fallback_url)
                     .header("Authorization", format!("OAuth {}", token))
                     .send()
                     .await
                     .map_err(|e| DomainError::Network(format!("Failed to fetch likes: {}", e)))?
             }
+            Ok(r) => return Err(DomainError::SoundCloud(format!("Failed to fetch next likes page, HTTP {}", r.status()))),
+            Err(e) => return Err(DomainError::Network(format!("Failed to fetch next likes page: {}", e))),
         };
 
         if !resp.status().is_success() {
@@ -471,7 +461,10 @@ impl SoundCloudGateway for RSoundCloudAdapter {
             }
         }
 
-        Ok(tracks)
+        Ok(PaginatedTracks {
+            tracks,
+            next_href: data.next_href,
+        })
     }
 
     async fn get_trending(&self, genre: Option<&str>, limit: u32) -> Result<Vec<Track>, DomainError> {
@@ -530,7 +523,7 @@ impl SoundCloudGateway for RSoundCloudAdapter {
                 if r.status().is_success() || status == 200 || status == 201 || status == 204 {
                     return Ok(());
                 }
-                eprintln!("[like_track] v2 PUT /likes/tracks/{} failed: {}", track_id, status);
+                log::warn!("[like_track] v2 PUT /likes/tracks/{} failed: {}", track_id, status);
             }
 
             // Also try POST if PUT fails
@@ -548,7 +541,7 @@ impl SoundCloudGateway for RSoundCloudAdapter {
                 if r.status().is_success() || status == 200 || status == 201 || status == 204 {
                     return Ok(());
                 }
-                eprintln!("[like_track] v2 POST /likes/tracks/{} failed: {}", track_id, status);
+                log::warn!("[like_track] v2 POST /likes/tracks/{} failed: {}", track_id, status);
             }
         }
 
@@ -604,7 +597,7 @@ impl SoundCloudGateway for RSoundCloudAdapter {
                 if r.status().is_success() || status == 200 || status == 204 {
                     return Ok(());
                 }
-                eprintln!("[unlike_track] v2 DELETE /likes/tracks/{} failed: {}", track_id, status);
+                log::warn!("[unlike_track] v2 DELETE /likes/tracks/{} failed: {}", track_id, status);
             }
         }
 

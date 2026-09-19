@@ -1,213 +1,211 @@
+import { tauriApi } from '../../../shared/api/tauri-client';
+
 export type AudioEngineStatus = 'idle' | 'buffering' | 'playing' | 'paused' | 'ended' | 'error';
 
 export interface AudioEngineListeners {
   onTimeUpdate?: (currentTime: number, duration: number) => void;
   onStatusChange?: (status: AudioEngineStatus) => void;
   onTrackEnded?: () => void;
-  onApproachingEnd?: () => void;
-  onError?: (err: MediaError | null) => void;
+  onError?: (err: unknown) => void;
 }
 
 export class AudioEngine {
-  private primaryAudio: HTMLAudioElement;
-  private secondaryAudio: HTMLAudioElement;
   private listeners: AudioEngineListeners = {};
-
+  private currentTime = 0;
+  private duration = 0;
   private masterVolume = 0.8;
   private isMuted = false;
-  private crossfadeDuration = 3.5; // seconds
-  private approachingEndTriggered = false;
-  private crossfadeTimer: number | null = null;
+  private unlisteners: Array<() => void> = [];
+
+  // Fallback HTML5 audio for non-Tauri browser environments
+  private fallbackAudio: HTMLAudioElement | null = null;
 
   constructor() {
-    this.primaryAudio = new Audio();
-    this.secondaryAudio = new Audio();
-    this.primaryAudio.preload = 'auto';
-    this.secondaryAudio.preload = 'auto';
-    this.bindEvents(this.primaryAudio);
+    if (tauriApi.isTauri()) {
+      this.initTauriListeners();
+    } else {
+      this.initFallbackAudio();
+    }
   }
 
   public setListeners(listeners: AudioEngineListeners) {
     this.listeners = listeners;
   }
 
-  public setCrossfadeDuration(seconds: number) {
-    this.crossfadeDuration = Math.max(0, Math.min(seconds, 12));
+  private async initTauriListeners() {
+    try {
+      const unTime = await tauriApi.onPlayerTime(({ current_time, duration }) => {
+        this.currentTime = current_time;
+        this.duration = duration;
+        this.listeners.onTimeUpdate?.(current_time, duration);
+      });
+      if (unTime) this.unlisteners.push(unTime);
+
+      const unStatus = await tauriApi.onPlayerStatus((status) => {
+        const mappedStatus: AudioEngineStatus =
+          status === 'playing'
+            ? 'playing'
+            : status === 'paused'
+            ? 'paused'
+            : status === 'buffering'
+            ? 'buffering'
+            : status === 'ended'
+            ? 'ended'
+            : 'idle';
+        this.listeners.onStatusChange?.(mappedStatus);
+      });
+      if (unStatus) this.unlisteners.push(unStatus);
+
+      const unEnded = await tauriApi.onPlayerEnded(() => {
+        this.listeners.onStatusChange?.('ended');
+        this.listeners.onTrackEnded?.();
+      });
+      if (unEnded) this.unlisteners.push(unEnded);
+    } catch (err) {
+      console.warn('[AudioEngine] Failed to bind Tauri player events:', err);
+    }
   }
 
-  public getCrossfadeDuration(): number {
-    return this.crossfadeDuration;
-  }
+  private initFallbackAudio() {
+    this.fallbackAudio = new Audio();
+    this.fallbackAudio.preload = 'auto';
 
-  private bindEvents(audio: HTMLAudioElement) {
-    audio.addEventListener('timeupdate', () => {
-      if (audio !== this.primaryAudio) return;
-      const cur = audio.currentTime;
-      const dur = audio.duration || 0;
-      this.listeners.onTimeUpdate?.(cur, dur);
-
-      // Check if approaching end for Spotify-style automatic crossfade
-      if (
-        this.crossfadeDuration > 0 &&
-        dur > 10 &&
-        cur >= dur - this.crossfadeDuration &&
-        !this.approachingEndTriggered
-      ) {
-        this.approachingEndTriggered = true;
-        this.listeners.onApproachingEnd?.();
-      }
+    this.fallbackAudio.addEventListener('timeupdate', () => {
+      if (!this.fallbackAudio) return;
+      this.currentTime = this.fallbackAudio.currentTime;
+      this.duration = this.fallbackAudio.duration || 0;
+      this.listeners.onTimeUpdate?.(this.currentTime, this.duration);
     });
 
-    audio.addEventListener('playing', () => {
-      if (audio === this.primaryAudio) {
-        this.listeners.onStatusChange?.('playing');
-      }
+    this.fallbackAudio.addEventListener('playing', () => {
+      this.listeners.onStatusChange?.('playing');
     });
 
-    audio.addEventListener('pause', () => {
-      if (audio === this.primaryAudio && !audio.ended && this.crossfadeTimer === null) {
+    this.fallbackAudio.addEventListener('pause', () => {
+      if (!this.fallbackAudio?.ended) {
         this.listeners.onStatusChange?.('paused');
       }
     });
 
-    audio.addEventListener('waiting', () => {
-      if (audio === this.primaryAudio) {
-        this.listeners.onStatusChange?.('buffering');
-      }
+    this.fallbackAudio.addEventListener('waiting', () => {
+      this.listeners.onStatusChange?.('buffering');
     });
 
-    audio.addEventListener('ended', () => {
-      if (audio === this.primaryAudio) {
-        this.listeners.onStatusChange?.('ended');
-        this.listeners.onTrackEnded?.();
-      }
+    this.fallbackAudio.addEventListener('ended', () => {
+      this.listeners.onStatusChange?.('ended');
+      this.listeners.onTrackEnded?.();
     });
 
-    audio.addEventListener('error', () => {
-      if (audio === this.primaryAudio) {
-        this.listeners.onStatusChange?.('error');
-        this.listeners.onError?.(audio.error);
-      }
+    this.fallbackAudio.addEventListener('error', () => {
+      this.listeners.onStatusChange?.('error');
+      this.listeners.onError?.(this.fallbackAudio?.error ?? null);
     });
   }
 
   /**
-   * Loads a new track directly, optionally with crossfade if audio is already playing.
+   * Loads a track and starts playback immediately without fade in / fade out.
    */
-  public async load(url: string, autoPlay = true, enableCrossfade = true): Promise<void> {
-    this.clearCrossfadeTimer();
-    this.approachingEndTriggered = false;
+  public async load(url: string, isLocal = false): Promise<void> {
+    this.currentTime = 0;
 
-    const isCurrentlyPlaying = !this.primaryAudio.paused && this.primaryAudio.currentTime > 0;
-    const duration = this.crossfadeDuration;
-
-    if (enableCrossfade && isCurrentlyPlaying && duration > 0.5) {
-      await this.crossfadeTo(url, duration);
+    if (tauriApi.isTauri()) {
+      try {
+        this.listeners.onStatusChange?.('buffering');
+        await tauriApi.playerLoadAndPlay(url, isLocal);
+        this.listeners.onStatusChange?.('playing');
+      } catch (err) {
+        console.error('[AudioEngine] Rust playback error:', err);
+        this.listeners.onStatusChange?.('error');
+        this.listeners.onError?.(err);
+      }
       return;
     }
 
-    // Direct switch with smooth micro-fade
-    this.primaryAudio.src = url;
-    this.primaryAudio.volume = this.effectiveVolume();
-    this.primaryAudio.load();
-
-    if (autoPlay) {
+    if (this.fallbackAudio) {
+      this.fallbackAudio.src = url;
+      this.fallbackAudio.volume = this.effectiveVolume();
+      this.fallbackAudio.load();
       try {
-        await this.primaryAudio.play();
+        await this.fallbackAudio.play();
       } catch (err) {
         console.warn('[AudioEngine] Playback blocked or failed:', err);
       }
     }
   }
 
-  /**
-   * Performs smooth dual-channel crossfade: fades out primary, fades in secondary, then swaps.
-   */
-  public async crossfadeTo(newUrl: string, durationSeconds = 3.5): Promise<void> {
-    this.clearCrossfadeTimer();
-    this.approachingEndTriggered = false;
-
-    const fadeOutAudio = this.primaryAudio;
-    const fadeInAudio = this.secondaryAudio;
-
-    fadeInAudio.src = newUrl;
-    fadeInAudio.volume = 0;
-    fadeInAudio.load();
-
-    try {
-      await fadeInAudio.play();
-    } catch (err) {
-      console.warn('[AudioEngine] Crossfade fadeIn failed, falling back:', err);
-      this.primaryAudio.src = newUrl;
-      this.primaryAudio.volume = this.effectiveVolume();
-      this.primaryAudio.play().catch(() => {});
+  public async play(): Promise<void> {
+    if (tauriApi.isTauri()) {
+      try {
+        await tauriApi.playerPlay();
+        this.listeners.onStatusChange?.('playing');
+      } catch (err) {
+        console.warn('[AudioEngine] play error:', err);
+      }
       return;
     }
 
-    // Prepare swap of primary listener target
-    this.primaryAudio = fadeInAudio;
-    this.secondaryAudio = fadeOutAudio;
-    this.bindEvents(this.primaryAudio);
-
-    const startTime = performance.now();
-    const durationMs = durationSeconds * 1000;
-    const targetVol = this.effectiveVolume();
-
-    const step = () => {
-      const elapsed = performance.now() - startTime;
-      const progress = Math.min(1, elapsed / durationMs);
-
-      // Equal-power crossfade curve for smooth sound energy
-      const inVol = targetVol * Math.sin(progress * (Math.PI / 2));
-      const outVol = targetVol * Math.cos(progress * (Math.PI / 2));
-
-      fadeInAudio.volume = Math.max(0, Math.min(1, inVol));
-      fadeOutAudio.volume = Math.max(0, Math.min(1, outVol));
-
-      if (progress < 1) {
-        this.crossfadeTimer = window.setTimeout(step, 40);
-      } else {
-        this.crossfadeTimer = null;
-        fadeOutAudio.pause();
-        fadeOutAudio.removeAttribute('src');
-        fadeOutAudio.load();
-        fadeInAudio.volume = targetVol;
-      }
-    };
-
-    step();
-  }
-
-  public async play(): Promise<void> {
     try {
-      await this.primaryAudio.play();
+      await this.fallbackAudio?.play();
     } catch (err) {
-      console.warn('[AudioEngine] Play error:', err);
+      console.warn('[AudioEngine] Fallback play error:', err);
     }
   }
 
   public pause(): void {
-    this.primaryAudio.pause();
+    if (tauriApi.isTauri()) {
+      tauriApi.playerPause().catch((err) => console.warn('[AudioEngine] pause error:', err));
+      this.listeners.onStatusChange?.('paused');
+      return;
+    }
+
+    this.fallbackAudio?.pause();
   }
 
   public seek(seconds: number): void {
-    if (Number.isFinite(seconds)) {
-      this.primaryAudio.currentTime = Math.max(
+    if (!Number.isFinite(seconds)) return;
+    this.currentTime = Math.max(0, seconds);
+
+    if (tauriApi.isTauri()) {
+      tauriApi.playerSeek(seconds).catch((err) => console.warn('[AudioEngine] seek error:', err));
+      return;
+    }
+
+    if (this.fallbackAudio) {
+      this.fallbackAudio.currentTime = Math.max(
         0,
-        Math.min(seconds, this.primaryAudio.duration || seconds)
+        Math.min(seconds, this.fallbackAudio.duration || seconds)
       );
     }
   }
 
   public setVolume(volume: number): void {
     this.masterVolume = Math.max(0, Math.min(volume, 1));
-    this.primaryAudio.volume = this.effectiveVolume();
+
+    if (tauriApi.isTauri()) {
+      tauriApi
+        .playerSetVolume(this.masterVolume)
+        .catch((err) => console.warn('[AudioEngine] setVolume error:', err));
+      return;
+    }
+
+    if (this.fallbackAudio) {
+      this.fallbackAudio.volume = this.effectiveVolume();
+    }
   }
 
   public setMuted(muted: boolean): void {
     this.isMuted = muted;
-    this.primaryAudio.muted = muted;
-    this.secondaryAudio.muted = muted;
+
+    if (tauriApi.isTauri()) {
+      tauriApi
+        .playerSetMuted(muted)
+        .catch((err) => console.warn('[AudioEngine] setMuted error:', err));
+      return;
+    }
+
+    if (this.fallbackAudio) {
+      this.fallbackAudio.muted = muted;
+    }
   }
 
   private effectiveVolume(): number {
@@ -215,30 +213,27 @@ export class AudioEngine {
   }
 
   public getCurrentTime(): number {
-    return this.primaryAudio.currentTime;
+    return this.currentTime;
   }
 
   public getDuration(): number {
-    return this.primaryAudio.duration || 0;
-  }
-
-  private clearCrossfadeTimer() {
-    if (this.crossfadeTimer !== null) {
-      clearTimeout(this.crossfadeTimer);
-      this.crossfadeTimer = null;
-      this.secondaryAudio.pause();
-      this.secondaryAudio.removeAttribute('src');
-      this.secondaryAudio.load();
-    }
+    return this.duration;
   }
 
   public destroy(): void {
-    this.clearCrossfadeTimer();
-    this.primaryAudio.pause();
-    this.primaryAudio.removeAttribute('src');
-    this.primaryAudio.load();
-    this.secondaryAudio.pause();
-    this.secondaryAudio.removeAttribute('src');
-    this.secondaryAudio.load();
+    for (const un of this.unlisteners) {
+      un();
+    }
+    this.unlisteners = [];
+
+    if (tauriApi.isTauri()) {
+      tauriApi.playerStop().catch(() => {});
+    }
+
+    if (this.fallbackAudio) {
+      this.fallbackAudio.pause();
+      this.fallbackAudio.removeAttribute('src');
+      this.fallbackAudio.load();
+    }
   }
 }

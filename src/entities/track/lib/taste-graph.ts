@@ -1,4 +1,9 @@
 import type { Track } from '../model/types';
+import {
+  cleanTrackTitle,
+  extractCanonicalArtist,
+  isAggregatorOrSpamArtist,
+} from './track-cleaner';
 
 export interface TasteNode {
   weight: number;
@@ -147,6 +152,19 @@ export function loadTasteGraph(): TasteGraphData {
     }
     if (!parsed.blacklist) parsed.blacklist = { artists: [], genres: [] };
     if (!parsed.pinned) parsed.pinned = { artists: [], genres: [] };
+
+    // Automatically prune any legacy spam / bot / re-upload artist nodes
+    let hasCleanedSpam = false;
+    for (const artist of Object.keys(parsed.artists)) {
+      if (isAggregatorOrSpamArtist(artist)) {
+        delete parsed.artists[artist];
+        hasCleanedSpam = true;
+      }
+    }
+    if (hasCleanedSpam) {
+      saveTasteGraph(parsed);
+    }
+
     return parsed;
   } catch (err) {
     console.error('[TasteGraph] Failed to load taste graph, resetting:', err);
@@ -203,7 +221,8 @@ export function getEffectiveWeight(node: TasteNode): number {
 
 export function extractGenresFromTrack(track: Track): string[] {
   const found = new Set<string>();
-  const fullText = `${track.title} ${track.genre || ''} ${track.permalink_url || ''}`.toLowerCase();
+  const cleanTitle = cleanTrackTitle(track.title);
+  const fullText = `${cleanTitle} ${track.genre || ''} ${track.permalink_url || ''}`.toLowerCase();
 
   // 1. Match specific SoundCloud micro-genres first
   for (const { pattern, canonical } of SOUNDCLOUD_MICRO_GENRES) {
@@ -293,9 +312,10 @@ export function recordTrackListen(track: Track, secondsListened: number, duratio
   const completionRatio = Math.min(1.0, secondsListened / Math.max(1, durationSec));
   const multiplier = completionRatio > 0.8 ? 1.4 : 1.0;
 
-  // Boost artist (+1.0 * multiplier)
-  if (track.artist) {
-    updateNode(graph.artists, track.artist, 1.0 * multiplier, true, false, false);
+  // Boost canonical artist (+1.0 * multiplier)
+  const canonicalArtist = extractCanonicalArtist(track);
+  if (canonicalArtist && !isAggregatorOrSpamArtist(canonicalArtist)) {
+    updateNode(graph.artists, canonicalArtist, 1.0 * multiplier, true, false, false);
   }
 
   // Boost genres (+0.75 * multiplier)
@@ -319,9 +339,10 @@ export function recordTrackSkip(track: Track, _secondsListened: number): void {
     graph.recentPlayedIds.push(track.id);
   }
 
-  // Penalize artist node (-1.0)
-  if (track.artist) {
-    updateNode(graph.artists, track.artist, -1.0, false, true, false);
+  // Penalize canonical artist node (-1.0)
+  const canonicalArtist = extractCanonicalArtist(track);
+  if (canonicalArtist && !isAggregatorOrSpamArtist(canonicalArtist)) {
+    updateNode(graph.artists, canonicalArtist, -1.0, false, true, false);
   }
 
   // Penalize genres node (-0.5)
@@ -341,8 +362,9 @@ export function recordTrackLike(track: Track): void {
   saveRecentPlayedTrack(track);
   const graph = loadTasteGraph();
 
-  if (track.artist) {
-    updateNode(graph.artists, track.artist, 3.5, false, false, true);
+  const canonicalArtist = extractCanonicalArtist(track);
+  if (canonicalArtist && !isAggregatorOrSpamArtist(canonicalArtist)) {
+    updateNode(graph.artists, canonicalArtist, 3.5, false, false, true);
   }
 
   const genres = extractGenresFromTrack(track);
@@ -360,8 +382,9 @@ export function recordTrackUnlike(track: Track): void {
   if (!track || !track.id) return;
   const graph = loadTasteGraph();
 
-  if (track.artist) {
-    updateNode(graph.artists, track.artist, -2.5, false, false, false);
+  const canonicalArtist = extractCanonicalArtist(track);
+  if (canonicalArtist && !isAggregatorOrSpamArtist(canonicalArtist)) {
+    updateNode(graph.artists, canonicalArtist, -2.5, false, false, false);
   }
 
   const genres = extractGenresFromTrack(track);
@@ -383,7 +406,7 @@ export function getTopTasteSeeds(
 
   const artists = Object.entries(graph.artists)
     .map(([name, node]) => ({ name, score: getEffectiveWeight(node) }))
-    .filter((item) => item.score > 0.8)
+    .filter((item) => item.score > 0.8 && !isAggregatorOrSpamArtist(item.name))
     .sort((a, b) => b.score - a.score)
     .slice(0, artistLimit)
     .map((item) => item.name);
@@ -415,8 +438,9 @@ export function scoreTrackAffinity(track: Track): number {
   const graph = loadTasteGraph();
   let score = 1.0;
 
-  if (track.artist) {
-    const cleanArtist = track.artist.trim().toLowerCase();
+  const canonical = extractCanonicalArtist(track);
+  if (canonical && !isAggregatorOrSpamArtist(canonical)) {
+    const cleanArtist = canonical.trim().toLowerCase();
     const artistNode = graph.artists[cleanArtist];
     if (artistNode) {
       score += getEffectiveWeight(artistNode) * 1.5;

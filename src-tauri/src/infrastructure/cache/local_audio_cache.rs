@@ -110,10 +110,74 @@ impl AudioCacheGateway for LocalAudioCache {
             )));
         }
 
-        let bytes = resp
+        let mut bytes = resp
             .bytes()
             .await
-            .map_err(|e| DomainError::Network(format!("Failed to read audio stream bytes: {}", e)))?;
+            .map_err(|e| DomainError::Network(format!("Failed to read audio stream bytes: {}", e)))?
+            .to_vec();
+
+        // If HLS playlist, resolve and concatenate segments
+        if bytes.starts_with(b"#EXTM3U") || bytes.starts_with(b"#EXT-X") {
+            let mut current_playlist_url = stream_url.to_string();
+            let mut m3u8_text = String::from_utf8_lossy(&bytes).to_string();
+
+            // If this is a master/variant playlist (contains child .m3u8), resolve the child playlist first
+            let child_playlist_path = m3u8_text
+                .lines()
+                .map(|l| l.trim())
+                .find(|l| !l.starts_with('#') && l.contains(".m3u8"))
+                .map(|s| s.to_string());
+
+            if let Some(child_path) = child_playlist_path {
+                let resolved_child_url = if child_path.starts_with("http://") || child_path.starts_with("https://") {
+                    child_path
+                } else if let Ok(base) = reqwest::Url::parse(&current_playlist_url) {
+                    base.join(&child_path).map(|u| u.to_string()).unwrap_or(child_path)
+                } else {
+                    child_path
+                };
+
+                if let Ok(child_resp) = self.http.get(&resolved_child_url).send().await {
+                    if child_resp.status().is_success() {
+                        if let Ok(child_bytes) = child_resp.bytes().await {
+                            current_playlist_url = resolved_child_url;
+                            m3u8_text = String::from_utf8_lossy(&child_bytes).to_string();
+                        }
+                    }
+                }
+            }
+
+            let segment_urls: Vec<String> = m3u8_text
+                .lines()
+                .map(|l| l.trim())
+                .filter(|l| !l.is_empty() && !l.starts_with('#'))
+                .map(|l| {
+                    if l.starts_with("http://") || l.starts_with("https://") {
+                        l.to_string()
+                    } else if let Ok(base) = reqwest::Url::parse(&current_playlist_url) {
+                        base.join(l).map(|u| u.to_string()).unwrap_or_else(|_| l.to_string())
+                    } else {
+                        l.to_string()
+                    }
+                })
+                .collect();
+
+            if !segment_urls.is_empty() {
+                let mut combined = Vec::new();
+                for seg_url in segment_urls {
+                    if let Ok(seg_resp) = self.http.get(&seg_url).send().await {
+                        if seg_resp.status().is_success() {
+                            if let Ok(seg_chunk) = seg_resp.bytes().await {
+                                combined.extend_from_slice(&seg_chunk);
+                            }
+                        }
+                    }
+                }
+                if !combined.is_empty() {
+                    bytes = combined;
+                }
+            }
+        }
 
         let size_bytes = bytes.len() as u64;
 

@@ -46,7 +46,7 @@
   color: #ffffff;
 }
 
-.glass-radio-group input:checked + label {
+.glass-radio-group input:checked+label {
   color: #ffffff;
   font-weight: 600;
 }
@@ -67,27 +67,27 @@
   transition: transform 0.5s cubic-bezier(0.37, 1.95, 0.66, 0.56);
 }
 
-#library-tab-soundcloud:checked ~ .glass-glider {
+#library-tab-soundcloud:checked~.glass-glider {
   transform: translateX(0%);
 }
 
-#library-tab-my-likes:checked ~ .glass-glider {
+#library-tab-my-likes:checked~.glass-glider {
   transform: translateX(100%);
 }
 
-#library-tab-cached:checked ~ .glass-glider {
+#library-tab-cached:checked~.glass-glider {
   transform: translateX(200%);
 }
 
-#library-tab-albums:checked ~ .glass-glider {
+#library-tab-albums:checked~.glass-glider {
   transform: translateX(300%);
 }
 
-#library-tab-artists:checked ~ .glass-glider {
+#library-tab-artists:checked~.glass-glider {
   transform: translateX(400%);
 }
 
-#library-tab-playlists:checked ~ .glass-glider {
+#library-tab-playlists:checked~.glass-glider {
   transform: translateX(500%);
 }
 
@@ -96,8 +96,6 @@
     min-width: 64px;
     font-size: 11px;
     padding: 0.22rem 0.42rem;
-    gap: 3.5px;
+    gap: 5px;
   }
 }
-
-

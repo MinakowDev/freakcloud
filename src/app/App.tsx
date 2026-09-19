@@ -18,6 +18,7 @@ import { LoginModal } from '../widgets/auth/ui/LoginModal';
 import { ArtistProvider } from '../entities/artist/model/artist-context';
 import { ArtistDetailModal } from '../widgets/artist-detail/ui/ArtistDetailModal';
 import { AddToPlaylistModal } from '../widgets/playlist-action/ui/AddToPlaylistModal';
+import { ExpandedPlayerModal } from '../widgets/expanded-player/ui/ExpandedPlayerModal';
 import { tauriApi } from '../shared/api/tauri-client';
 import type { Track } from '../entities/track/model/types';
 import './styles/index.css';
@@ -176,6 +177,9 @@ export const AppContent: React.FC = () => {
 
       {/* 5. Add Track To Custom Playlist Modal */}
       <AddToPlaylistModal />
+
+      {/* 6. Spotify-like Expanded Player & Synced Lyrics Modal */}
+      <ExpandedPlayerModal />
     </div>
   );
 };

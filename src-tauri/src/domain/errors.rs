@@ -23,6 +23,9 @@ pub enum DomainError {
     #[error("Network error: {0}")]
     Network(String),
 
+    #[error("Playback error: {0}")]
+    Playback(String),
+
     #[error("Unexpected error: {0}")]
     Unexpected(String),
 }

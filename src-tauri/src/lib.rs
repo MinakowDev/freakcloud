@@ -5,15 +5,19 @@ pub mod interfaces;
 
 use std::sync::Arc;
 use application::AppState;
+use domain::ports::AudioPlayerPort;
 use infrastructure::{
-    DiscordRpcService, FilePlaylistStorage, FileSessionStorage, LocalAudioCache, RSoundCloudAdapter,
+    DiscordRpcService, FilePlaylistStorage, FileSessionStorage, LocalAudioCache,
+    RSoundCloudAdapter, RodioAudioPlayer,
 };
 use interfaces::tauri::commands::{
     cache_track, clear_cache, clear_discord_rpc, get_cache_stats, get_cached_tracks,
     get_current_session, get_my_likes, get_playlist_details, get_related_tracks,
     get_saved_playlists, get_track_details, get_track_stream, get_trending, is_playlist_saved,
-    is_track_cached, like_track, login_with_token, logout, open_soundcloud_login,
-    remove_cached_track, remove_saved_playlist, save_playlist, search_albums, search_playlists, search_tracks,
+    is_track_cached, like_track, log_frontend_error, login_with_token, logout, open_log_dir, open_soundcloud_login,
+    player_get_state, player_load_and_play, player_pause, player_play, player_seek,
+    player_set_muted, player_set_volume, player_stop, remove_cached_track,
+    remove_saved_playlist, save_playlist, search_albums, search_playlists, search_tracks,
     set_discord_client_id, set_discord_rpc_enabled, unlike_track, update_discord_rpc,
 };
 
@@ -51,8 +55,19 @@ pub fn run() {
         (gw, cache, p_repo)
     });
 
+    let audio_player = Arc::new(
+        RodioAudioPlayer::new()
+            .expect("Failed to initialize RodioAudioPlayer"),
+    );
     let discord_rpc = Arc::new(DiscordRpcService::new());
-    let app_state = AppState::new(gateway, session_repo, audio_cache, playlist_repo, discord_rpc);
+    let app_state = AppState::new(
+        gateway,
+        session_repo,
+        audio_cache,
+        playlist_repo,
+        discord_rpc,
+        audio_player.clone(),
+    );
 
     use infrastructure::start_loopback_server;
     use tauri::{
@@ -73,7 +88,28 @@ fn show_main_window(app: tauri::AppHandle) {
     }
 }
 
+    use tauri_plugin_log::{RotationStrategy, Target, TargetKind, TimezoneStrategy};
+
     tauri::Builder::default()
+        .plugin(
+            tauri_plugin_log::Builder::new()
+                .targets([
+                    Target::new(TargetKind::Stdout),
+                    Target::new(TargetKind::LogDir {
+                        file_name: Some("freakcloud".into()),
+                    }),
+                    Target::new(TargetKind::Webview),
+                ])
+                .level(log::LevelFilter::Info)
+                .level_for("hyper", log::LevelFilter::Warn)
+                .level_for("reqwest", log::LevelFilter::Warn)
+                .level_for("symphonia", log::LevelFilter::Warn)
+                .level_for("cpal", log::LevelFilter::Warn)
+                .rotation_strategy(RotationStrategy::KeepAll)
+                .max_file_size(2 * 1024 * 1024)
+                .timezone_strategy(TimezoneStrategy::UseLocal)
+                .build(),
+        )
         .plugin(tauri_plugin_opener::init())
         .manage(app_state)
         .on_window_event(|window, event| {
@@ -83,8 +119,9 @@ fn show_main_window(app: tauri::AppHandle) {
                 }
             }
         })
-        .setup(|app| {
+        .setup(move |app| {
             let app_handle = app.handle().clone();
+            audio_player.set_app_handle(app_handle.clone());
             tauri::async_runtime::spawn(async move {
                 start_loopback_server(app_handle).await;
             });
@@ -216,6 +253,16 @@ fn show_main_window(app: tauri::AppHandle) {
             clear_discord_rpc,
             set_discord_rpc_enabled,
             set_discord_client_id,
+            player_load_and_play,
+            player_play,
+            player_pause,
+            player_seek,
+            player_set_volume,
+            player_set_muted,
+            player_stop,
+            player_get_state,
+            log_frontend_error,
+            open_log_dir,
         ])
         .run(tauri::generate_context!())
         .expect("error while running freakcloud application");
