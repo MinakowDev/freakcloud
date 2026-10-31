@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
 import { useTranslation } from '../../../shared/lib/i18n';
+import { STORAGE_KEYS, APP_LINKS } from '../../../shared/config';
 import './SupportBanner.css';
 
-const DISMISSED_KEY = 'freakcloud_github_star_dismissed';
-const GITHUB_URL = 'https://github.com/MinakowDev/freakcloud';
+const DISMISSED_KEY = STORAGE_KEYS.SUPPORT_DISMISSED;
+const GITHUB_URL = APP_LINKS.GITHUB_REPO;
 
 function openExternalUrl(url: string): void {
   import('@tauri-apps/plugin-opener')

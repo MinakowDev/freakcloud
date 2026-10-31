@@ -1,3 +1,5 @@
+export type TrackSource = 'soundcloud' | 'local';
+
 export interface Track {
   id: number;
   title: string;
@@ -12,6 +14,8 @@ export interface Track {
   genre?: string;
   permalink_url: string;
   is_cached?: boolean;
+  source?: TrackSource;
+  external_id?: string;
 }
 
 export interface AudioSource {

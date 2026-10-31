@@ -10,6 +10,7 @@ import { PlayerBar } from '../widgets/player-bar/ui/PlayerBar';
 import { HomePage } from '../pages/home/ui/HomePage';
 import { SearchPage } from '../pages/search/ui/SearchPage';
 import { LibraryPage } from '../pages/library/ui/LibraryPage';
+import { HistoryPage } from '../pages/history/ui/HistoryPage';
 import { SettingsPage } from '../pages/settings/ui/SettingsPage';
 import { LoginPage } from '../pages/login/ui/LoginPage';
 import { TasteGraphPage } from '../pages/taste-graph/ui/TasteGraphPage';
@@ -19,6 +20,9 @@ import { ArtistProvider } from '../entities/artist/model/artist-context';
 import { ArtistDetailModal } from '../widgets/artist-detail/ui/ArtistDetailModal';
 import { AddToPlaylistModal } from '../widgets/playlist-action/ui/AddToPlaylistModal';
 import { ExpandedPlayerModal } from '../widgets/expanded-player/ui/ExpandedPlayerModal';
+import { ConfirmProvider } from '../shared/lib/confirm-context';
+import { ImportProvider } from '../shared/lib/import-context';
+import { ImportProgressToast } from '../widgets/import-toast';
 import { tauriApi } from '../shared/api/tauri-client';
 import type { Track } from '../entities/track/model/types';
 import './styles/index.css';
@@ -155,7 +159,8 @@ export const AppContent: React.FC = () => {
                   }}
                 />
               )}
-              {currentPage === 'library' && <LibraryPage />}
+              {currentPage === 'library' && <LibraryPage onNavigate={navigateTo} />}
+              {currentPage === 'history' && <HistoryPage />}
               {currentPage === 'taste-graph' && <TasteGraphPage onNavigate={navigateTo} />}
               {currentPage === 'settings' && <SettingsPage />}
             </main>
@@ -180,6 +185,9 @@ export const AppContent: React.FC = () => {
 
       {/* 6. Spotify-like Expanded Player & Synced Lyrics Modal */}
       <ExpandedPlayerModal />
+
+      {/* 7. Background Import Progress Toast */}
+      <ImportProgressToast onOpenPlaylist={() => navigateTo('library')} />
     </div>
   );
 };
@@ -187,17 +195,21 @@ export const AppContent: React.FC = () => {
 export const App: React.FC = () => {
   return (
     <SessionProvider>
-      <CacheProvider>
-        <LikesProvider>
-          <PlaylistProvider>
-            <PlayerProvider>
-              <ArtistProvider>
-                <AppContent />
-              </ArtistProvider>
-            </PlayerProvider>
-          </PlaylistProvider>
-        </LikesProvider>
-      </CacheProvider>
+      <ConfirmProvider>
+        <CacheProvider>
+          <LikesProvider>
+            <PlaylistProvider>
+              <PlayerProvider>
+                <ArtistProvider>
+                  <ImportProvider>
+                    <AppContent />
+                  </ImportProvider>
+                </ArtistProvider>
+              </PlayerProvider>
+            </PlaylistProvider>
+          </LikesProvider>
+        </CacheProvider>
+      </ConfirmProvider>
     </SessionProvider>
   );
 };

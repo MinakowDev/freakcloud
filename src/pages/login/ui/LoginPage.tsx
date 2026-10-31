@@ -3,6 +3,7 @@ import { useSession } from '../../../entities/session/model/session-context';
 import { useTranslation } from '../../../shared/lib/i18n';
 import { tauriApi } from '../../../shared/api/tauri-client';
 import { playRandomLoginSfx } from '../../../shared/lib/sfx';
+import { APP_LINKS } from '../../../shared/config';
 import './LoginPage.css';
 
 interface LoginPageProps {
@@ -10,7 +11,7 @@ interface LoginPageProps {
   onGuestContinue?: () => void;
 }
 
-const EXTENSION_PATH = 'd:\\Sys\\Dev\\freackcloud\\freakcloud-extension';
+const EXTENSION_REPO_URL = APP_LINKS.EXTENSION_REPO;
 
 export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess, onGuestContinue }) => {
   const { session, loginWithToken, isLoading } = useSession();
@@ -18,7 +19,6 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess, onGuestCon
 
   const [isSuccess, setIsSuccess] = useState(false);
   const [showExtensionGuide, setShowExtensionGuide] = useState(false);
-  const [pathCopied, setPathCopied] = useState(false);
   const [showManual, setShowManual] = useState(false);
   const [tokenInput, setTokenInput] = useState('');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -50,14 +50,12 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess, onGuestCon
     }
   };
 
-  // Handler for copying extension folder path
-  const handleCopyPath = async () => {
+  // Handler for opening extension repository
+  const handleOpenExtensionRepo = async () => {
     try {
-      await navigator.clipboard.writeText(EXTENSION_PATH);
-      setPathCopied(true);
-      setTimeout(() => setPathCopied(false), 2500);
+      await tauriApi.openExternal(EXTENSION_REPO_URL);
     } catch (err) {
-      console.error('Failed to copy path:', err);
+      console.error('Failed to open extension repo:', err);
     }
   };
 
@@ -96,12 +94,11 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess, onGuestCon
       {/* Entrance animated login instructions & buttons */}
       <div className={`login-form-container ${isSuccess ? 'form-exit' : ''}`}>
         <div className="login-card">
-          {/* Badge & Instructions */}
-          <div className="flex flex-col gap-1.5 text-center">
-            <div className="inline-flex items-center justify-center gap-1.5 self-center px-2.5 py-0.5 rounded-full bg-zinc-800/80 border border-zinc-700/60 text-zinc-300 text-xs font-mono">
-              <i className="ri-shield-keyhole-line text-xs"></i>
-              <span>{messages.login_page.instruction_badge}</span>
-            </div>
+          {/* Instructions */}
+          <div className="flex flex-col gap-1 text-center">
+            <span className="text-sm font-semibold text-white">
+              {messages.login_page.instruction_badge}
+            </span>
             <p className="text-xs text-zinc-400 leading-relaxed px-2">
               {messages.login_page.instruction_text}
             </p>
@@ -120,7 +117,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess, onGuestCon
           </div>
 
           {/* Extension Setup Guide Toggle & Box */}
-          <div className="flex flex-col gap-2 p-3 bg-zinc-900/60 border border-zinc-800/80 rounded-xl">
+          <div className="flex flex-col gap-2 p-3 bg-zinc-900/60 border border-zinc-800/80 rounded-md">
             <button
               type="button"
               onClick={() => setShowExtensionGuide((prev) => !prev)}
@@ -140,11 +137,11 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess, onGuestCon
                 <div className="pt-1">
                   <button
                     type="button"
-                    onClick={handleCopyPath}
-                    className="w-full flex items-center justify-center gap-1.5 py-1.5 px-2.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-xs font-medium border border-zinc-700/60 transition-colors"
+                    onClick={handleOpenExtensionRepo}
+                    className="w-full flex items-center justify-center gap-1.5 py-1.5 px-2.5 rounded-md bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-xs font-medium border border-zinc-700/60 transition-colors"
                   >
-                    <i className={pathCopied ? 'ri-check-line text-green-400' : 'ri-file-copy-line'}></i>
-                    <span>{pathCopied ? messages.login_page.path_copied : messages.login_page.copy_path}</span>
+                    <i className="ri-github-fill text-sm"></i>
+                    <span>{messages.login_page.open_extension_page}</span>
                   </button>
                 </div>
               </div>

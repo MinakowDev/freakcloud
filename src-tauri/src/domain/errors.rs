@@ -5,11 +5,17 @@ pub enum DomainError {
     #[error("SoundCloud API error: {0}")]
     SoundCloud(String),
 
+    #[error("YouTube Music error: {0}")]
+    YouTube(String),
+
     #[error("Track not found: ID {0}")]
     TrackNotFound(u64),
 
     #[error("Stream not available for track {0}")]
     StreamNotAvailable(u64),
+
+    #[error("DRM protected: {0}")]
+    DrmProtected(String),
 
     #[error("Authentication required for this operation")]
     Unauthorized,
@@ -25,6 +31,12 @@ pub enum DomainError {
 
     #[error("Playback error: {0}")]
     Playback(String),
+
+    #[error("Validation error: {0}")]
+    Validation(String),
+
+    #[error("External service error: {0}")]
+    ExternalService(String),
 
     #[error("Unexpected error: {0}")]
     Unexpected(String),

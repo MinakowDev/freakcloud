@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef, useMemo, useCallback } from 'react';
-import { usePlayer } from '../../../entities/player/model/player-context';
+import { usePlayer, usePlayerProgress } from '../../../entities/player/model/player-context';
 import { useLikes } from '../../../entities/track/model/likes-context';
 import { useCache } from '../../../entities/track/model/cache-context';
 import { useArtist } from '../../../entities/artist/model/artist-context';
@@ -12,8 +12,6 @@ export const ExpandedPlayerModal: React.FC = () => {
     currentTrack,
     isPlaying,
     isBuffering,
-    currentTime,
-    duration,
     volume,
     isMuted,
     isShuffle,
@@ -29,7 +27,9 @@ export const ExpandedPlayerModal: React.FC = () => {
     toggleRepeat,
     toggleLyricsOpen,
     setLyricsOpen,
+    dislikeTrack,
   } = usePlayer();
+  const { currentTime, duration } = usePlayerProgress();
 
   const { isLiked, toggleLike } = useLikes();
   const { isCached, cacheTrack, removeCachedTrack, isDownloading } = useCache();
@@ -328,6 +328,15 @@ export const ExpandedPlayerModal: React.FC = () => {
 
                   <button
                     type="button"
+                    onClick={() => dislikeTrack(currentTrack)}
+                    className="w-9 h-9 rounded-full flex items-center justify-center transition-colors text-zinc-400 hover:text-white hover:bg-zinc-800/80"
+                    title={messages.player.dislike}
+                  >
+                    <i className="ri-thumb-down-line text-xl"></i>
+                  </button>
+
+                  <button
+                    type="button"
                     onClick={() => (cached ? removeCachedTrack(currentTrack.id) : cacheTrack(currentTrack))}
                     disabled={downloading}
                     className={`w-9 h-9 rounded-full flex items-center justify-center transition-colors ${
@@ -479,7 +488,7 @@ export const ExpandedPlayerModal: React.FC = () => {
 
           <button
             type="button"
-            onClick={nextTrack}
+            onClick={() => nextTrack(true)}
             className="text-zinc-400 hover:text-white transition-colors flex items-center justify-center"
             title={messages.player.next}
           >

@@ -2,13 +2,15 @@ use std::sync::Arc;
 
 use crate::{
     application::use_cases::{
-        AuthenticateUseCase, CacheTrackUseCase, GetTrackStreamUseCase, GetTrendingUseCase,
-        ManageCacheUseCase, ManagePlaylistsUseCase, SearchTracksUseCase,
+        AuthenticateUseCase, CacheTrackUseCase, GenerateWaveBatchUseCase, GetTrackStreamUseCase,
+        GetTrendingUseCase, ImportPlaylistUseCase, ManageCacheUseCase, ManagePlaylistsUseCase,
+        SearchTracksUseCase,
     },
     domain::ports::{
         AudioCacheGateway, AudioPlayerPort, PlaylistRepository, SessionRepository,
         SoundCloudGateway,
     },
+    infrastructure::importer::ExternalImporter,
 };
 
 pub struct AppState {
@@ -16,15 +18,20 @@ pub struct AppState {
     pub get_track_stream: GetTrackStreamUseCase,
     pub authenticate: AuthenticateUseCase,
     pub get_trending: GetTrendingUseCase,
+    pub generate_wave_batch: GenerateWaveBatchUseCase,
     pub cache_track: CacheTrackUseCase,
     pub manage_cache: ManageCacheUseCase,
     pub manage_playlists: ManagePlaylistsUseCase,
+    pub import_playlist: ImportPlaylistUseCase,
     pub gateway: Arc<dyn SoundCloudGateway>,
     pub session_repo: Arc<dyn SessionRepository>,
     pub audio_cache: Arc<dyn AudioCacheGateway>,
     pub playlist_repo: Arc<dyn PlaylistRepository>,
     pub discord_rpc: Arc<crate::infrastructure::DiscordRpcService>,
     pub audio_player: Arc<dyn AudioPlayerPort>,
+    pub tray_pinned: Arc<std::sync::atomic::AtomicBool>,
+    pub global_shortcuts_enabled: Arc<std::sync::atomic::AtomicBool>,
+    pub tray_widget_enabled: Arc<std::sync::atomic::AtomicBool>,
 }
 
 impl AppState {
@@ -36,20 +43,27 @@ impl AppState {
         discord_rpc: Arc<crate::infrastructure::DiscordRpcService>,
         audio_player: Arc<dyn AudioPlayerPort>,
     ) -> Self {
+        let importer = Arc::new(ExternalImporter::new());
+
         Self {
             search_tracks: SearchTracksUseCase::new(gateway.clone()),
             get_track_stream: GetTrackStreamUseCase::new(gateway.clone(), audio_cache.clone()),
             authenticate: AuthenticateUseCase::new(gateway.clone(), session_repo.clone()),
             get_trending: GetTrendingUseCase::new(gateway.clone()),
+            generate_wave_batch: GenerateWaveBatchUseCase::new(gateway.clone()),
             cache_track: CacheTrackUseCase::new(gateway.clone(), audio_cache.clone()),
             manage_cache: ManageCacheUseCase::new(audio_cache.clone()),
             manage_playlists: ManagePlaylistsUseCase::new(gateway.clone(), playlist_repo.clone()),
+            import_playlist: ImportPlaylistUseCase::new(importer, gateway.clone(), playlist_repo.clone()),
             gateway,
             session_repo,
             audio_cache,
             playlist_repo,
             discord_rpc,
             audio_player,
+            tray_pinned: Arc::new(std::sync::atomic::AtomicBool::new(false)),
+            global_shortcuts_enabled: Arc::new(std::sync::atomic::AtomicBool::new(true)),
+            tray_widget_enabled: Arc::new(std::sync::atomic::AtomicBool::new(true)),
         }
     }
 }

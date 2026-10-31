@@ -40,56 +40,170 @@ pub async fn start_loopback_server(app: AppHandle) {
                 return;
             }
 
+            if first_line.starts_with("GET /status") || first_line.starts_with("GET /ping") {
+                let mut is_auth = false;
+                let mut username_val = None;
+
+                if let Some(state) = app_handle.try_state::<AppState>() {
+                    if let Ok(sess) = state.authenticate.get_current_session().await {
+                        is_auth = sess.is_authenticated;
+                        username_val = sess.user.map(|u| u.username);
+                    }
+                }
+
+                let username_json = match username_val {
+                    Some(u) => format!("\"{}\"", u.replace('\\', "\\\\").replace('"', "\\\"")),
+                    None => "null".to_string(),
+                };
+
+                let json = format!(
+                    "{{\"status\":\"ok\",\"app\":\"freakcloud\",\"authenticated\":{},\"username\":{}}}",
+                    is_auth, username_json
+                );
+
+                let resp = format!(
+                    "HTTP/1.1 200 OK\r\nContent-Type: application/json; charset=utf-8\r\nContent-Length: {}\r\nAccess-Control-Allow-Origin: *\r\nAccess-Control-Allow-Methods: GET, OPTIONS\r\nAccess-Control-Allow-Headers: *\r\nConnection: close\r\n\r\n{}",
+                    json.len(),
+                    json
+                );
+                let _ = socket.write_all(resp.as_bytes()).await;
+                return;
+            }
+
             if first_line.starts_with("GET /login") {
                 let mut token_opt = None;
-                if let Some(idx) = first_line.find("?token=") {
-                    let rest = &first_line[idx + 7..];
-                    let end = rest.find(' ').or_else(|| rest.find('&')).unwrap_or(rest.len());
+                let mut client_id_opt = None;
+
+                // Extract query string: between '?' and first space (or end of line)
+                if let Some(q_idx) = first_line.find('?') {
+                    let after_q = &first_line[q_idx + 1..];
+                    let query_str = match after_q.find(' ') {
+                        Some(s_idx) => &after_q[..s_idx],
+                        None => after_q,
+                    };
+
+                    for pair in query_str.split('&') {
+                        let mut parts = pair.splitn(2, '=');
+                        let key = parts.next().unwrap_or("");
+                        let val = parts.next().unwrap_or("");
+                        if key == "token" {
+                            let decoded = url_decode(val);
+                            let clean = decoded.trim();
+                            if !clean.is_empty() {
+                                token_opt = Some(clean.to_string());
+                            }
+                        } else if key == "client_id" {
+                            let decoded = url_decode(val);
+                            let clean = decoded.trim();
+                            if !clean.is_empty() {
+                                client_id_opt = Some(clean.to_string());
+                            }
+                        }
+                    }
+                } else if let Some(idx) = first_line.find("token=") {
+                    // Fallback for paths like /login/token=XYZ
+                    let rest = &first_line[idx + 6..];
+                    let end = [rest.find(' '), rest.find('&'), rest.find('#')]
+                        .into_iter()
+                        .flatten()
+                        .min()
+                        .unwrap_or(rest.len());
                     let raw_token = &rest[..end];
-                    token_opt = Some(url_decode(raw_token));
+                    let decoded = url_decode(raw_token);
+                    let clean = decoded.trim();
+                    if !clean.is_empty() {
+                        token_opt = Some(clean.to_string());
+                    }
                 }
 
                 if let Some(token) = token_opt {
                     let clean_token = token.trim();
                     if !clean_token.is_empty() {
+                        let mut login_ok = false;
+                        let mut username_opt = None;
+
                         if let Some(state) = app_handle.try_state::<AppState>() {
-                            let _ = state.authenticate.login_with_token(clean_token).await;
-                            let _ = app_handle.emit("session_updated", ());
+                            let prefix_len = clean_token.len().min(8);
+                            log::info!(
+                                "[Loopback] Attempting login with token: {}..., client_id: {:?}",
+                                &clean_token[..prefix_len],
+                                client_id_opt
+                            );
+                            match state.authenticate.login_with_token_and_client_id(clean_token, client_id_opt.as_deref()).await {
+                                Ok(sess) => {
+                                    login_ok = true;
+                                    username_opt = sess.user.map(|u| u.username);
+                                    let _ = app_handle.emit("session_updated", ());
+                                }
+                                Err(err) => {
+                                    log::warn!("[Loopback] Login failed: {:?}", err);
+                                }
+                            }
                         }
 
-                        let html = r#"<!DOCTYPE html>
+                        let wants_json = req_str.contains("application/json")
+                            || first_line.contains("&format=json")
+                            || first_line.contains("?format=json");
+
+                        if login_ok {
+                            if wants_json {
+                                let u_str = username_opt.as_deref().unwrap_or("");
+                                let json = format!(
+                                    "{{\"status\":\"ok\",\"authenticated\":true,\"username\":\"{}\"}}",
+                                    u_str.replace('\\', "\\\\").replace('"', "\\\"")
+                                );
+                                let resp = format!(
+                                    "HTTP/1.1 200 OK\r\nContent-Type: application/json; charset=utf-8\r\nContent-Length: {}\r\nAccess-Control-Allow-Origin: *\r\nAccess-Control-Allow-Methods: GET, OPTIONS\r\nAccess-Control-Allow-Headers: *\r\nConnection: close\r\n\r\n{}",
+                                    json.len(),
+                                    json
+                                );
+                                let _ = socket.write_all(resp.as_bytes()).await;
+                                return;
+                            }
+
+                            let html = r#"<!DOCTYPE html>
 <html>
 <head>
   <meta charset="utf-8">
   <title>freakcloud</title>
   <style>
     body { background: #000000; color: #ffffff; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; }
-    .box { text-align: center; background: #09090b; padding: 36px 48px; border-radius: 16px; border: 1px solid #27272a; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.7); max-width: 380px; }
-    h1 { font-size: 22px; margin: 0 0 10px 0; font-weight: 600; color: #ffffff; }
-    p { color: #a1a1aa; font-size: 14px; margin: 0; line-height: 1.5; }
+    .box { text-align: center; background: #080808; padding: 36px 48px; border-radius: 8px; border: 1px solid #1a1a1a; max-width: 380px; }
+    h1 { font-size: 20px; margin: 0 0 10px 0; font-weight: 600; color: #ffffff; }
+    p { color: #8e8e93; font-size: 13px; margin: 0; line-height: 1.5; }
   </style>
 </head>
 <body>
   <div class="box">
     <h1>✓ Успешно!</h1>
     <p>Авторизация передана в freakcloud. Можете закрыть эту вкладку.</p>
-    <script>setTimeout(function() { window.close(); }, 2500);</script>
+    <script>setTimeout(function() { window.close(); }, 2000);</script>
   </div>
 </body>
 </html>"#;
 
-                        let resp = format!(
-                            "HTTP/1.1 200 OK\r\nContent-Type: text/html; charset=utf-8\r\nContent-Length: {}\r\nAccess-Control-Allow-Origin: *\r\nConnection: close\r\n\r\n{}",
-                            html.len(),
-                            html
-                        );
-                        let _ = socket.write_all(resp.as_bytes()).await;
-                        return;
+                            let resp = format!(
+                                "HTTP/1.1 200 OK\r\nContent-Type: text/html; charset=utf-8\r\nContent-Length: {}\r\nAccess-Control-Allow-Origin: *\r\nAccess-Control-Allow-Methods: GET, OPTIONS\r\nAccess-Control-Allow-Headers: *\r\nConnection: close\r\n\r\n{}",
+                                html.len(),
+                                html
+                            );
+                            let _ = socket.write_all(resp.as_bytes()).await;
+                            return;
+                        } else {
+                            let json = "{\"status\":\"error\",\"message\":\"invalid_token\"}";
+                            let resp = format!(
+                                "HTTP/1.1 401 Unauthorized\r\nContent-Type: application/json; charset=utf-8\r\nContent-Length: {}\r\nAccess-Control-Allow-Origin: *\r\nAccess-Control-Allow-Methods: GET, OPTIONS\r\nAccess-Control-Allow-Headers: *\r\nConnection: close\r\n\r\n{}",
+                                json.len(),
+                                json
+                            );
+                            let _ = socket.write_all(resp.as_bytes()).await;
+                            return;
+                        }
                     }
                 }
             }
 
-            let not_found = "HTTP/1.1 404 Not Found\r\nContent-Length: 0\r\nConnection: close\r\n\r\n";
+            let not_found = "HTTP/1.1 404 Not Found\r\nContent-Length: 0\r\nAccess-Control-Allow-Origin: *\r\nConnection: close\r\n\r\n";
             let _ = socket.write_all(not_found.as_bytes()).await;
         });
     }

@@ -1,19 +1,23 @@
 use std::{
     fs::File,
-    io::Cursor,
+    io::{BufReader, Cursor},
     path::PathBuf,
     sync::{
         atomic::{AtomicBool, AtomicU64, Ordering},
         Arc, RwLock,
     },
     thread,
-    time::Duration,
+    time::{Duration, Instant},
 };
 
+use aes::Aes128;
+use cbc::cipher::{block_padding::Pkcs7, BlockDecryptMut, KeyIvInit};
 use async_trait::async_trait;
 use rodio::{Decoder, OutputStream, Sink, Source};
 use tauri::{AppHandle, Emitter};
 use tokio::sync::{mpsc, oneshot, RwLock as TokioRwLock};
+
+type Aes128CbcDec = cbc::Decryptor<Aes128>;
 
 use crate::domain::{
     errors::DomainError,
@@ -85,14 +89,65 @@ impl RodioAudioPlayer {
                     }
                 };
 
+                #[derive(Clone)]
+                enum ActiveSource {
+                    Bytes(Vec<u8>),
+                    File(PathBuf),
+                }
+
                 let mut current_duration = 0.0;
                 let mut target_volume = 0.8f32;
                 let mut is_muted = false;
                 let mut has_track = false;
                 let mut active_seq = 0u64;
                 let is_playing = Arc::new(AtomicBool::new(false));
+                let mut active_source: Option<ActiveSource> = None;
+
+                let recreate_sink_from_source = |stream_handle: &rodio::OutputStreamHandle,
+                                                 src: &ActiveSource,
+                                                 target_vol: f32,
+                                                 muted: bool,
+                                                 seek_to: Option<Duration>|
+                 -> Result<(Sink, f64), String> {
+                    let new_sink = Sink::try_new(stream_handle)
+                        .map_err(|e| format!("Sink creation error: {:?}", e))?;
+                    let duration = match src {
+                        ActiveSource::Bytes(data) => {
+                            let cursor = BufReader::new(Cursor::new(data.clone()));
+                            let source = Decoder::new(cursor)
+                                .map_err(|e| format!("Decode error: {:?}", e))?;
+                            let dur = source
+                                .total_duration()
+                                .map(|d| d.as_secs_f64())
+                                .unwrap_or(0.0);
+                            new_sink.append(source);
+                            dur
+                        }
+                        ActiveSource::File(path) => {
+                            let file = File::open(path)
+                                .map_err(|e| format!("File open error: {:?}", e))?;
+                            let source = Decoder::new(BufReader::new(file))
+                                .map_err(|e| format!("Decode error: {:?}", e))?;
+                            let dur = source
+                                .total_duration()
+                                .map(|d| d.as_secs_f64())
+                                .unwrap_or(0.0);
+                            new_sink.append(source);
+                            dur
+                        }
+                    };
+                    let eff_vol = if muted { 0.0 } else { target_vol };
+                    new_sink.set_volume(eff_vol);
+                    if let Some(pos) = seek_to {
+                        if pos > Duration::ZERO {
+                            let _ = new_sink.try_seek(pos);
+                        }
+                    }
+                    Ok((new_sink, duration))
+                };
 
                 sink.set_volume(target_volume);
+                let mut last_time_emit = Instant::now();
 
                 loop {
                     // Process commands
@@ -105,35 +160,31 @@ impl RodioAudioPlayer {
                                 }
                                 active_seq = seq;
                                 sink.stop();
-                                sink = match Sink::try_new(&stream_handle) {
-                                    Ok(s) => s,
-                                    Err(e) => {
-                                        has_track = false;
-                                        is_playing.store(false, Ordering::SeqCst);
-                                        let _ = reply.send(Err(format!("Sink recreation error: {:?}", e)));
-                                        continue;
-                                    }
-                                };
 
-                                let cursor = Cursor::new(bytes);
-                                match Decoder::new(cursor) {
-                                    Ok(source) => {
-                                        current_duration = source
-                                            .total_duration()
-                                            .map(|d| d.as_secs_f64())
-                                            .unwrap_or(0.0);
-                                        sink.append(source);
-                                        let eff_vol = if is_muted { 0.0 } else { target_volume };
-                                        sink.set_volume(eff_vol);
+                                let len = bytes.len();
+                                let audio_data = if bytes.starts_with(b"ID3") {
+                                    log::info!("[RodioPlayer] Stripping ID3v2.4 header ({})", 10);
+                                    bytes[10..].to_vec()
+                                } else {
+                                    bytes.clone()
+                                };
+                                let src = ActiveSource::Bytes(audio_data);
+                                match recreate_sink_from_source(&stream_handle, &src, target_volume, is_muted, None) {
+                                    Ok((new_sink, dur)) => {
+                                        sink = new_sink;
+                                        current_duration = dur;
                                         sink.play();
                                         has_track = true;
                                         is_playing.store(true, Ordering::SeqCst);
+                                        active_source = Some(src);
                                         let _ = reply.send(Ok(()));
                                     }
                                     Err(err) => {
                                         has_track = false;
+                                        active_source = None;
                                         is_playing.store(false, Ordering::SeqCst);
-                                        let _ = reply.send(Err(format!("Decode error: {:?}", err)));
+                                        log::error!("[RodioPlayer] Decode error for {} bytes: {}", len, err);
+                                        let _ = reply.send(Err(err));
                                     }
                                 }
                             }
@@ -144,48 +195,40 @@ impl RodioAudioPlayer {
                                 }
                                 active_seq = seq;
                                 sink.stop();
-                                sink = match Sink::try_new(&stream_handle) {
-                                    Ok(s) => s,
-                                    Err(e) => {
-                                        has_track = false;
-                                        is_playing.store(false, Ordering::SeqCst);
-                                        let _ = reply.send(Err(format!("Sink recreation error: {:?}", e)));
-                                        continue;
-                                    }
-                                };
 
-                                match File::open(&path) {
-                                    Ok(file) => match Decoder::new(std::io::BufReader::new(file)) {
-                                        Ok(source) => {
-                                            current_duration = source
-                                                .total_duration()
-                                                .map(|d| d.as_secs_f64())
-                                                .unwrap_or(0.0);
-                                            sink.append(source);
-                                            let eff_vol = if is_muted { 0.0 } else { target_volume };
-                                            sink.set_volume(eff_vol);
-                                            sink.play();
-                                            has_track = true;
-                                            is_playing.store(true, Ordering::SeqCst);
-                                            let _ = reply.send(Ok(()));
-                                        }
-                                        Err(err) => {
-                                            has_track = false;
-                                            is_playing.store(false, Ordering::SeqCst);
-                                            let _ = reply.send(Err(format!("Decode error: {:?}", err)));
-                                        }
-                                    },
+                                let src = ActiveSource::File(path);
+                                match recreate_sink_from_source(&stream_handle, &src, target_volume, is_muted, None) {
+                                    Ok((new_sink, dur)) => {
+                                        sink = new_sink;
+                                        current_duration = dur;
+                                        sink.play();
+                                        has_track = true;
+                                        is_playing.store(true, Ordering::SeqCst);
+                                        active_source = Some(src);
+                                        let _ = reply.send(Ok(()));
+                                    }
                                     Err(err) => {
                                         has_track = false;
+                                        active_source = None;
                                         is_playing.store(false, Ordering::SeqCst);
-                                        let _ = reply.send(Err(format!("File open error: {:?}", err)));
+                                        log::error!("[RodioPlayer] File open/decode error: {}", err);
+                                        let _ = reply.send(Err(err));
                                     }
                                 }
                             }
                             AudioWorkerCommand::Play => {
-                                if has_track {
+                                if has_track && !sink.empty() {
                                     sink.play();
                                     is_playing.store(true, Ordering::SeqCst);
+                                } else if let Some(ref src) = active_source {
+                                    sink.stop();
+                                    if let Ok((new_sink, dur)) = recreate_sink_from_source(&stream_handle, src, target_volume, is_muted, None) {
+                                        sink = new_sink;
+                                        current_duration = dur;
+                                        sink.play();
+                                        has_track = true;
+                                        is_playing.store(true, Ordering::SeqCst);
+                                    }
                                 }
                             }
                             AudioWorkerCommand::Pause => {
@@ -193,13 +236,34 @@ impl RodioAudioPlayer {
                                 is_playing.store(false, Ordering::SeqCst);
                             }
                             AudioWorkerCommand::Seek(sec) => {
-                                if has_track {
-                                    let d = Duration::from_secs_f64(sec.max(0.0));
-                                    let _ = sink.try_seek(d);
+                                let d = Duration::from_secs_f64(sec.max(0.0));
+                                let was_playing = is_playing.load(Ordering::SeqCst);
+                                let mut seek_success = false;
+
+                                if has_track && !sink.empty() {
+                                    if sink.try_seek(d).is_ok() {
+                                        seek_success = true;
+                                    }
+                                }
+
+                                if !seek_success {
+                                    if let Some(ref src) = active_source {
+                                        sink.stop();
+                                        if let Ok((new_sink, dur)) = recreate_sink_from_source(&stream_handle, src, target_volume, is_muted, Some(d)) {
+                                            sink = new_sink;
+                                            current_duration = dur;
+                                            has_track = true;
+                                            if was_playing {
+                                                sink.play();
+                                            } else {
+                                                sink.pause();
+                                            }
+                                        }
+                                    }
                                 }
                             }
                             AudioWorkerCommand::SetVolume(v) => {
-                                target_volume = v.clamp(0.0, 1.0);
+                                target_volume = v.clamp(0.0, 2.0);
                                 if !is_muted {
                                     sink.set_volume(target_volume);
                                 }
@@ -211,6 +275,7 @@ impl RodioAudioPlayer {
                             AudioWorkerCommand::Stop => {
                                 sink.stop();
                                 has_track = false;
+                                active_source = None;
                                 is_playing.store(false, Ordering::SeqCst);
                             }
                         }
@@ -255,8 +320,9 @@ impl RodioAudioPlayer {
                         lock.is_muted = is_muted;
                     }
 
-                    // Broadcast time update to frontend
-                    if playing_now {
+                    // Broadcast time update to frontend (throttled to ~250ms for smooth UI without IPC overload)
+                    if playing_now && last_time_emit.elapsed() >= Duration::from_millis(250) {
+                        last_time_emit = Instant::now();
                         if let Ok(slot) = app_handle_slot_clone.read() {
                             if let Some(app) = slot.as_ref() {
                                 #[derive(serde::Serialize, Clone)]
@@ -281,6 +347,8 @@ impl RodioAudioPlayer {
             .map_err(|e| DomainError::Playback(format!("Failed to spawn audio thread: {}", e)))?;
 
         let http = reqwest::Client::builder()
+            .timeout(Duration::from_secs(15))
+            .connect_timeout(Duration::from_secs(5))
             .user_agent("Mozilla/5.0 (Windows NT 10.0; Win64; x64)")
             .build()
             .map_err(|e| DomainError::Network(e.to_string()))?;
@@ -311,6 +379,7 @@ impl AudioPlayerPort for RodioAudioPlayer {
                 })
                 .map_err(|e| DomainError::Playback(format!("Worker channel closed: {}", e)))?;
         } else {
+            log::info!("[RodioPlayer] load_and_play url={}", &url_or_path[..url_or_path.len().min(120)]);
             let resp = self
                 .http
                 .get(&url_or_path)
@@ -319,9 +388,12 @@ impl AudioPlayerPort for RodioAudioPlayer {
                 .map_err(|e| DomainError::Network(format!("Failed to stream track: {}", e)))?;
 
             if !resp.status().is_success() {
+                let status = resp.status();
+                let body = resp.text().await.unwrap_or_default();
+                log::error!("[RodioPlayer] Initial fetch HTTP {} body={:?}", status, &body[..body.len().min(200)]);
                 return Err(DomainError::Network(format!(
                     "Failed to stream track, HTTP status: {}",
-                    resp.status()
+                    status
                 )));
             }
 
@@ -331,10 +403,16 @@ impl AudioPlayerPort for RodioAudioPlayer {
                 .map_err(|e| DomainError::Network(format!("Failed to read stream bytes: {}", e)))?
                 .to_vec();
 
-            // Handle HLS playlist (.m3u8) by downloading and concatenating segments
+            log::info!("[RodioPlayer] Downloaded {} bytes, starts_with={:?}", audio_bytes.len(), &audio_bytes[..audio_bytes.len().min(16)]);
+
+            // Handle HLS playlist (.m3u8) by downloading and (optionally) decrypting segments
             if audio_bytes.starts_with(b"#EXTM3U") || audio_bytes.starts_with(b"#EXT-X") {
                 let mut current_playlist_url = url_or_path.clone();
                 let mut m3u8_text = String::from_utf8_lossy(&audio_bytes).to_string();
+                log::info!("[RodioPlayer] Detected HLS playlist, {} chars, preview={:?}",
+                    m3u8_text.len(),
+                    &m3u8_text[..m3u8_text.len().min(800)]
+                );
 
                 // If this is a master/variant playlist (contains child .m3u8), resolve the child playlist first
                 let child_playlist_path = m3u8_text
@@ -362,37 +440,220 @@ impl AudioPlayerPort for RodioAudioPlayer {
                     }
                 }
 
-                let segment_urls: Vec<String> = m3u8_text
-                    .lines()
-                    .map(|l| l.trim())
-                    .filter(|l| !l.is_empty() && !l.starts_with('#'))
-                    .map(|l| {
-                        if l.starts_with("http://") || l.starts_with("https://") {
-                            l.to_string()
-                        } else if let Ok(base) = reqwest::Url::parse(&current_playlist_url) {
-                            base.join(l).map(|u| u.to_string()).unwrap_or_else(|_| l.to_string())
-                        } else {
-                            l.to_string()
+                // Parse AES-128 encryption key from #EXT-X-KEY tag if present
+                // Format: #EXT-X-KEY:METHOD=AES-128,URI="https://...",IV=0x...
+                let aes_key: Option<[u8; 16]> = {
+                    let mut key_bytes: Option<[u8; 16]> = None;
+                    for line in m3u8_text.lines() {
+                        let line = line.trim();
+                        if line.starts_with("#EXT-X-KEY:") && line.contains("METHOD=AES-128") {
+                            // Extract URI
+                            let uri = line.split(',').find_map(|part| {
+                                let part = part.trim();
+                                if part.starts_with("URI=") {
+                                    Some(part.trim_start_matches("URI=").trim_matches('"').to_string())
+                                } else {
+                                    None
+                                }
+                            });
+                            if let Some(key_uri) = uri {
+                                let resolved_key_url = if key_uri.starts_with("http://") || key_uri.starts_with("https://") {
+                                    key_uri
+                                } else if let Ok(base) = reqwest::Url::parse(&current_playlist_url) {
+                                    base.join(&key_uri).map(|u| u.to_string()).unwrap_or(key_uri)
+                                } else {
+                                    key_uri
+                                };
+                                if let Ok(key_resp) = self.http.get(&resolved_key_url).send().await {
+                                    if key_resp.status().is_success() {
+                                        if let Ok(key_data) = key_resp.bytes().await {
+                                            if key_data.len() == 16 {
+                                                let mut arr = [0u8; 16];
+                                                arr.copy_from_slice(&key_data);
+                                                key_bytes = Some(arr);
+                                                log::info!("[RodioPlayer] AES-128 key fetched OK from {}", resolved_key_url);
+                                            } else {
+                                                log::warn!("[RodioPlayer] AES key wrong length: {} (expected 16)", key_data.len());
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                            break;
                         }
-                    })
-                    .collect();
+                    }
+                    key_bytes
+                };
 
-                if !segment_urls.is_empty() {
-                    let mut combined = Vec::new();
-                    for seg_url in segment_urls {
-                        if self.seq.load(Ordering::SeqCst) != current_seq {
-                            return Ok(());
+                // Detect real DRM in m3u8 before wasting time on segments.
+                // METHOD=SAMPLE-AES + KEYFORMAT="com.apple.streamingkeydelivery" = FairPlay DRM
+                // These cannot be decrypted without Apple's CDM license server.
+                let has_fairplay_drm = m3u8_text.lines().any(|l| {
+                    let l = l.trim();
+                    l.starts_with("#EXT-X-KEY:") && l.contains("METHOD=SAMPLE-AES") &&
+                    (l.contains("com.apple.streamingkeydelivery") || l.contains("com.microsoft.playready") || l.contains("skd://"))
+                });
+                if has_fairplay_drm {
+                    log::warn!("[RodioPlayer] m3u8 has FairPlay/SAMPLE-AES DRM — cannot decrypt");
+                    return Err(DomainError::DrmProtected(
+                        "Трек защищен DRM (FairPlay/SAMPLE-AES) и недоступен для стороннего воспроизведения".to_string()
+                    ));
+                }
+
+                // Parse #EXT-X-MAP (init segment required for fMP4/CMAF delivery)
+                // Must be prepended to combined segments buffer for symphonia to decode correctly
+                let mut init_segment: Vec<u8> = Vec::new();
+                for line in m3u8_text.lines() {
+                    let line = line.trim();
+                    if line.starts_with("#EXT-X-MAP:") {
+                        // Extract URI from #EXT-X-MAP:URI="..."
+                        // Cannot split by comma because URL may contain commas; search for URI= directly
+                        let map_url_opt = if let Some(uri_start) = line.find("URI=\"") {
+                            let after = &line[uri_start + 5..]; // skip URI="
+                            after.find('"').map(|end| after[..end].to_string())
+                        } else if let Some(uri_start) = line.find("URI=") {
+                            let after = &line[uri_start + 4..];
+                            let end = after.find(|c: char| c == ',' || c.is_whitespace()).unwrap_or(after.len());
+                            Some(after[..end].to_string())
+                        } else {
+                            None
+                        };
+
+                        if let Some(map_path) = map_url_opt {
+                            let map_url = if map_path.starts_with("http://") || map_path.starts_with("https://") {
+                                map_path
+                            } else if let Ok(base) = reqwest::Url::parse(&current_playlist_url) {
+                                base.join(&map_path).map(|u| u.to_string()).unwrap_or(map_path)
+                            } else {
+                                map_path
+                            };
+                            log::info!("[RodioPlayer] Fetching EXT-X-MAP init segment from {}", &map_url[..map_url.len().min(120)]);
+                            match self.http.get(&map_url).send().await {
+                                Ok(r) if r.status().is_success() => {
+                                    match r.bytes().await {
+                                        Ok(b) => {
+                                            log::info!("[RodioPlayer] Init segment {} bytes, first={:?}", b.len(), &b[..b.len().min(8)]);
+                                            init_segment = b.to_vec();
+                                        }
+                                        Err(e) => log::warn!("[RodioPlayer] Init segment read error: {}", e),
+                                    }
+                                }
+                                Ok(r) => log::warn!("[RodioPlayer] Init segment HTTP {}", r.status()),
+                                Err(e) => log::warn!("[RodioPlayer] Init segment fetch error: {}", e),
+                            }
                         }
-                        if let Ok(seg_resp) = self.http.get(&seg_url).send().await {
-                            if seg_resp.status().is_success() {
-                                if let Ok(seg_chunk) = seg_resp.bytes().await {
-                                    combined.extend_from_slice(&seg_chunk);
+                        break;
+                    }
+                }
+
+                // Parse segments with per-segment IV from #EXT-X-KEY or sequence number
+                struct SegmentEntry {
+                    url: String,
+                    iv: Option<[u8; 16]>,
+                }
+
+                let mut segment_entries: Vec<SegmentEntry> = Vec::new();
+                let mut current_iv: Option<[u8; 16]> = None;
+                let mut seg_seq: u64 = 0; // absolute media sequence counter for IV derivation
+
+                for line in m3u8_text.lines() {
+                    let line = line.trim();
+                    if line.starts_with("#EXT-X-MEDIA-SEQUENCE:") {
+                        if let Ok(n) = line.trim_start_matches("#EXT-X-MEDIA-SEQUENCE:").parse::<u64>() {
+                            seg_seq = n;
+                        }
+                    } else if line.starts_with("#EXT-X-KEY:") {
+                        // Update IV from key tag (IV may change per key block)
+                        let iv_hex = line.split(',').find_map(|part| {
+                            let part = part.trim();
+                            if part.starts_with("IV=") {
+                                Some(part.trim_start_matches("IV=").trim_start_matches("0x").trim_start_matches("0X").to_string())
+                            } else {
+                                None
+                            }
+                        });
+                        if let Some(hex) = iv_hex {
+                            if hex.len() == 32 {
+                                let decoded: Vec<u8> = (0..16)
+                                    .filter_map(|i| u8::from_str_radix(&hex[i*2..i*2+2], 16).ok())
+                                    .collect();
+                                if decoded.len() == 16 {
+                                    let mut arr = [0u8; 16];
+                                    arr.copy_from_slice(&decoded);
+                                    current_iv = Some(arr);
                                 }
                             }
                         }
+                    } else if !line.is_empty() && !line.starts_with('#') {
+                        let seg_url = if line.starts_with("http://") || line.starts_with("https://") {
+                            line.to_string()
+                        } else if let Ok(base) = reqwest::Url::parse(&current_playlist_url) {
+                            base.join(line).map(|u| u.to_string()).unwrap_or_else(|_| line.to_string())
+                        } else {
+                            line.to_string()
+                        };
+
+                        // If no explicit IV in key tag, use segment sequence number as IV (RFC 8216 §4.3.2.4)
+                        let iv = current_iv.or_else(|| {
+                            if aes_key.is_some() {
+                                let mut arr = [0u8; 16];
+                                arr[8..].copy_from_slice(&seg_seq.to_be_bytes());
+                                Some(arr)
+                            } else {
+                                None
+                            }
+                        });
+
+                        segment_entries.push(SegmentEntry { url: seg_url, iv });
+                        seg_seq += 1;
+                    }
+                }
+
+                if !segment_entries.is_empty() {
+                    log::info!("[RodioPlayer] Downloading {} segments, aes_key={}, init_segment={} bytes",
+                        segment_entries.len(), aes_key.is_some(), init_segment.len());
+                    let mut combined = Vec::new();
+                    // Prepend init segment if present (required for fMP4/CMAF)
+                    if !init_segment.is_empty() {
+                        combined.extend_from_slice(&init_segment);
+                    }
+                    for (i, entry) in segment_entries.into_iter().enumerate() {
+                        if self.seq.load(Ordering::SeqCst) != current_seq {
+                            return Ok(());
+                        }
+                        match self.http.get(&entry.url).send().await {
+                            Ok(seg_resp) if seg_resp.status().is_success() => {
+                                match seg_resp.bytes().await {
+                                    Ok(seg_chunk) => {
+                                        let seg_data = seg_chunk.to_vec();
+                                        if i == 0 {
+                                            log::info!("[RodioPlayer] Seg 0 first bytes={:?} (0x47=TS, 0x00=fMP4, else=encrypted?)",
+                                                &seg_data[..seg_data.len().min(8)]);
+                                        }
+                                        let decrypted = if let (Some(key), Some(iv)) = (aes_key, entry.iv) {
+                                            match Aes128CbcDec::new(&key.into(), &iv.into())
+                                                .decrypt_padded_vec_mut::<Pkcs7>(&seg_data)
+                                            {
+                                                Ok(plain) => { log::info!("[RodioPlayer] Seg {} decrypted {} -> {} bytes", i, seg_data.len(), plain.len()); plain }
+                                                Err(e) => { log::warn!("[RodioPlayer] Seg {} decrypt error: {:?}, using raw {} bytes", i, e, seg_data.len()); seg_data }
+                                            }
+                                        } else {
+                                            seg_data
+                                        };
+                                        combined.extend_from_slice(&decrypted);
+                                    }
+                                    Err(e) => log::warn!("[RodioPlayer] Seg {} bytes read error: {}", i, e),
+                                }
+                            }
+                            Ok(seg_resp) => log::warn!("[RodioPlayer] Seg {} HTTP {}", i, seg_resp.status()),
+                            Err(e) => log::warn!("[RodioPlayer] Seg {} fetch error: {}", i, e),
+                        }
                     }
                     if !combined.is_empty() {
+                        log::info!("[RodioPlayer] Combined {} bytes total, sending to decoder", combined.len());
                         audio_bytes = combined;
+                    } else {
+                        log::error!("[RodioPlayer] Combined buffer empty after downloading all segments");
                     }
                 }
             }

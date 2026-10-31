@@ -4,17 +4,34 @@ import { useCache } from '../../../entities/track/model/cache-context';
 import { usePlayer } from '../../../entities/player/model/player-context';
 import { formatBytes } from '../../../entities/track/lib/format-time';
 import { useTranslation } from '../../../shared/lib/i18n';
+import { useConfirm } from '../../../shared/lib/confirm-context';
 import { Switch } from '../../../shared/ui/Switch';
 import { tauriApi } from '../../../shared/api/tauri-client';
 import { entityCache } from '../../../shared/lib/entity-cache';
 import { loadTasteGraph, resetTasteGraph, clearTasteBlacklist } from '../../../entities/track/lib/taste-graph';
+import { ImportPlaylistModal } from '../../../widgets/import-playlist';
+import { DeduplicatorModal } from '../../../widgets/deduplicator';
+import { windowsMediaControls } from '../../../entities/player/lib/windows-media-controls';
+
+import { STORAGE_KEYS } from '../../../shared/config';
+import { LOUDNESS_NORM_EVENT } from '../../../entities/player/lib/loudness';
+import type { Track } from '../../../entities/track/model/types';
+import {
+  getLocalTracks,
+  saveLocalTracks,
+  getLocalMusicDir,
+  saveLocalMusicDir,
+} from '../../../entities/playlist/lib/smart-playlists';
 
 export const SettingsPage: React.FC = () => {
   const { session, loginWithToken, openOAuthModal, logout, isLoading, error } = useSession();
   const { cacheStats, clearCache, autoCache, setAutoCache } = useCache();
   const { isWaveMode, setWaveMode } = usePlayer();
   const { locale, setLocale, t } = useTranslation();
+  const confirm = useConfirm();
 
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false);
+  const [isDeduplicatorOpen, setIsDeduplicatorOpen] = useState(false);
   const [tokenInput, setTokenInput] = useState('');
   const [showManualInput, setShowManualInput] = useState(false);
   const [cacheMessage, setCacheMessage] = useState<string | null>(null);
@@ -23,15 +40,28 @@ export const SettingsPage: React.FC = () => {
 
   // Audio settings
   const [audioQuality, setAudioQuality] = useState<'original' | 'hq' | 'standard'>(() => {
-    return (localStorage.getItem('freakcloud_audio_quality') as 'original' | 'hq' | 'standard') || 'original';
+    return (localStorage.getItem(STORAGE_KEYS.AUDIO_QUALITY) as 'original' | 'hq' | 'standard') || 'original';
   });
   const [volumeNorm, setVolumeNorm] = useState(() => {
-    return localStorage.getItem('freakcloud_volume_norm') === 'true';
+    return localStorage.getItem(STORAGE_KEYS.VOLUME_NORM) !== 'false';
+  });
+  const [globalShortcuts, setGlobalShortcuts] = useState(() => {
+    return localStorage.getItem(STORAGE_KEYS.GLOBAL_SHORTCUTS) !== 'false';
+  });
+
+  // Windows Media Controls (SMTC)
+  const [windowsMediaControlsState, setWindowsMediaControlsState] = useState(() => {
+    return localStorage.getItem(STORAGE_KEYS.WINDOWS_MEDIA_CONTROLS) !== 'false';
+  });
+
+  // Tray Mini-Player Widget
+  const [trayWidgetEnabled, setTrayWidgetEnabledState] = useState(() => {
+    return localStorage.getItem(STORAGE_KEYS.TRAY_WIDGET_ENABLED) !== 'false';
   });
 
   // Discord RPC
   const [discordRpc, setDiscordRpc] = useState(() => {
-    return localStorage.getItem('discord_rpc_enabled') !== 'false';
+    return localStorage.getItem(STORAGE_KEYS.DISCORD_RPC_ENABLED) !== 'false';
   });
 
   // Entity cache stats
@@ -64,17 +94,39 @@ export const SettingsPage: React.FC = () => {
 
   const handleAudioQualityChange = (q: 'original' | 'hq' | 'standard') => {
     setAudioQuality(q);
-    localStorage.setItem('freakcloud_audio_quality', q);
+    localStorage.setItem(STORAGE_KEYS.AUDIO_QUALITY, q);
   };
 
   const handleVolumeNormChange = (enabled: boolean) => {
     setVolumeNorm(enabled);
-    localStorage.setItem('freakcloud_volume_norm', String(enabled));
+    localStorage.setItem(STORAGE_KEYS.VOLUME_NORM, String(enabled));
+    window.dispatchEvent(new CustomEvent(LOUDNESS_NORM_EVENT));
+  };
+
+  const handleToggleGlobalShortcuts = async (enabled: boolean) => {
+    setGlobalShortcuts(enabled);
+    localStorage.setItem(STORAGE_KEYS.GLOBAL_SHORTCUTS, String(enabled));
+    if (tauriApi.isTauri()) {
+      await tauriApi.setGlobalShortcutsEnabled(enabled);
+    }
+  };
+
+  const handleToggleWindowsMediaControls = (enabled: boolean) => {
+    setWindowsMediaControlsState(enabled);
+    windowsMediaControls.setEnabled(enabled);
+  };
+
+  const handleToggleTrayWidget = async (enabled: boolean) => {
+    setTrayWidgetEnabledState(enabled);
+    localStorage.setItem(STORAGE_KEYS.TRAY_WIDGET_ENABLED, String(enabled));
+    if (tauriApi.isTauri()) {
+      await tauriApi.setTrayWidgetEnabled(enabled);
+    }
   };
 
   const handleToggleDiscordRpc = async (enabled: boolean) => {
     setDiscordRpc(enabled);
-    localStorage.setItem('discord_rpc_enabled', String(enabled));
+    localStorage.setItem(STORAGE_KEYS.DISCORD_RPC_ENABLED, String(enabled));
     if (tauriApi.isTauri()) {
       await tauriApi.setDiscordRpcEnabled(enabled);
     }
@@ -90,20 +142,45 @@ export const SettingsPage: React.FC = () => {
   };
 
   const handleClearCache = async () => {
-    await clearCache();
-    setCacheMessage(t('settings.cache_cleared'));
-    setTimeout(() => setCacheMessage(null), 3000);
+    const ok = await confirm({
+      title: t('settings.clear_cache_title'),
+      message: t('settings.clear_cache_desc'),
+      confirmText: t('common.clear'),
+      cancelText: t('common.cancel'),
+      isDanger: true,
+    });
+    if (ok) {
+      await clearCache();
+      setCacheMessage(t('settings.cache_cleared'));
+      setTimeout(() => setCacheMessage(null), 3000);
+    }
   };
 
-  const handleClearMetadataCache = () => {
-    entityCache.clearEntityCache();
-    setEntityStats(entityCache.getEntityCacheStats());
-    setMetadataMessage(t('settings.metadata_cleared'));
-    setTimeout(() => setMetadataMessage(null), 3000);
+  const handleClearMetadataCache = async () => {
+    const ok = await confirm({
+      title: t('settings.clear_metadata_title'),
+      message: t('settings.clear_metadata_desc'),
+      confirmText: t('common.clear'),
+      cancelText: t('common.cancel'),
+      isDanger: true,
+    });
+    if (ok) {
+      entityCache.clearEntityCache();
+      setEntityStats(entityCache.getEntityCacheStats());
+      setMetadataMessage(t('settings.metadata_cleared'));
+      setTimeout(() => setMetadataMessage(null), 3000);
+    }
   };
 
-  const handleResetTasteGraph = () => {
-    if (window.confirm('Сбросить профиль вкусов? Анализ прослушиваний начнётся заново.')) {
+  const handleResetTasteGraph = async () => {
+    const ok = await confirm({
+      title: t('settings.taste_reset_title'),
+      message: t('settings.taste_reset_desc'),
+      confirmText: t('common.reset'),
+      cancelText: t('common.cancel'),
+      isDanger: true,
+    });
+    if (ok) {
       resetTasteGraph();
       refreshTasteStats();
       setTasteMessage(t('settings.taste_reset_success'));
@@ -111,16 +188,87 @@ export const SettingsPage: React.FC = () => {
     }
   };
 
-  const handleClearBlacklist = () => {
-    clearTasteBlacklist();
-    refreshTasteStats();
-    setTasteMessage(t('settings.blacklist_cleared'));
-    setTimeout(() => setTasteMessage(null), 3000);
+  const handleClearBlacklist = async () => {
+    const ok = await confirm({
+      title: t('settings.clear_blacklist_title'),
+      message: t('settings.clear_blacklist_desc'),
+      confirmText: t('common.clear'),
+      cancelText: t('common.cancel'),
+      isDanger: true,
+    });
+    if (ok) {
+      clearTasteBlacklist();
+      refreshTasteStats();
+      setTasteMessage(t('settings.blacklist_cleared'));
+      setTimeout(() => setTasteMessage(null), 3000);
+    }
   };
 
   const handleOpenLogs = async () => {
     if (tauriApi.isTauri()) {
       await tauriApi.openLogDir();
+    }
+  };
+
+  // Local Music Files
+  const [localMusicDir, setLocalMusicDir] = useState<string | null>(() => getLocalMusicDir());
+  const [localTracks, setLocalTracks] = useState<Track[]>(() => getLocalTracks());
+  const [isScanning, setIsScanning] = useState(false);
+  const [localScanMessage, setLocalScanMessage] = useState<string | null>(null);
+
+  const handlePickFolder = async () => {
+    try {
+      const selected = await tauriApi.pickLocalMusicFolder();
+      if (!selected) return;
+      saveLocalMusicDir(selected);
+      setLocalMusicDir(selected);
+      setIsScanning(true);
+      setLocalScanMessage(null);
+      const scanned = await tauriApi.scanLocalFolder(selected);
+      saveLocalTracks(scanned);
+      setLocalTracks(scanned);
+      setLocalScanMessage(t('settings.local_scan_success').replace('{count}', String(scanned.length)));
+      setTimeout(() => setLocalScanMessage(null), 4000);
+    } catch (err) {
+      console.error('[Settings] Failed to scan local folder:', err);
+      setLocalScanMessage(String(err));
+    } finally {
+      setIsScanning(false);
+    }
+  };
+
+  const handleRescanFolder = async () => {
+    if (!localMusicDir || isScanning) return;
+    try {
+      setIsScanning(true);
+      setLocalScanMessage(null);
+      const scanned = await tauriApi.scanLocalFolder(localMusicDir);
+      saveLocalTracks(scanned);
+      setLocalTracks(scanned);
+      setLocalScanMessage(t('settings.local_scan_success').replace('{count}', String(scanned.length)));
+      setTimeout(() => setLocalScanMessage(null), 4000);
+    } catch (err) {
+      console.error('[Settings] Failed to rescan local folder:', err);
+      setLocalScanMessage(String(err));
+    } finally {
+      setIsScanning(false);
+    }
+  };
+
+  const handleRemoveFolder = async () => {
+    const ok = await confirm({
+      title: t('settings.remove_folder_confirm_title'),
+      message: t('settings.remove_folder_confirm_desc'),
+      confirmText: t('common.remove'),
+      cancelText: t('common.cancel'),
+      isDanger: true,
+    });
+    if (ok) {
+      saveLocalMusicDir(null);
+      saveLocalTracks([]);
+      setLocalMusicDir(null);
+      setLocalTracks([]);
+      setLocalScanMessage(null);
     }
   };
 
@@ -326,12 +474,12 @@ export const SettingsPage: React.FC = () => {
                 <button
                   onClick={openOAuthModal}
                   disabled={isLoading}
-                  className="neu-button-primary px-4 py-2 rounded-xl text-xs font-semibold flex items-center gap-2 flex-shrink-0 disabled:opacity-50"
+                  className="neu-button-primary px-4 py-2 rounded-md text-xs font-semibold flex items-center gap-2 flex-shrink-0 disabled:opacity-50"
                 >
                   {isLoading ? (
                     <i className="ri-loader-4-line text-base animate-spin"></i>
                   ) : (
-                    <i className="ri-external-link-line text-sm"></i>
+                    <i className="ri-puzzle-line text-sm"></i>
                   )}
                   <span>{t('settings.browser_login_btn')}</span>
                 </button>
@@ -530,10 +678,136 @@ export const SettingsPage: React.FC = () => {
               {t('settings.open_logs_btn')}
             </button>
           </div>
+
+          <div className="h-[1px] w-full bg-zinc-900/60" />
+
+          {/* Import Music */}
+          <div className="flex items-center justify-between">
+            <div className="flex flex-col gap-0.5">
+              <span className="text-sm font-semibold text-white">
+                {t('import.modal_title')}
+              </span>
+              <span className="text-xs text-zinc-400">
+                {t('import.modal_subtitle')}
+              </span>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setIsImportModalOpen(true)}
+              className="neu-button px-3.5 py-1.5 rounded-xl text-zinc-300 hover:text-white text-xs font-semibold flex items-center gap-1.5"
+            >
+              <i className="ri-download-cloud-2-line text-sm text-orange-400" />
+              <span>{t('import.import_action')}</span>
+            </button>
+          </div>
+
+          <div className="h-[1px] w-full bg-zinc-900/60" />
+
+          {/* Deduplicator / Clean Duplicates */}
+          <div className="flex items-center justify-between">
+            <div className="flex flex-col gap-0.5">
+              <span className="text-sm font-semibold text-white">
+                {t('deduplicator.settings_title')}
+              </span>
+              <span className="text-xs text-zinc-400">
+                {t('deduplicator.settings_desc')}
+              </span>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setIsDeduplicatorOpen(true)}
+              className="neu-button px-3.5 py-1.5 rounded-xl text-zinc-300 hover:text-white text-xs font-semibold flex items-center gap-1.5"
+            >
+              <i className="ri-file-copy-2-line text-sm text-orange-400" />
+              <span>{t('deduplicator.settings_btn')}</span>
+            </button>
+          </div>
         </div>
       </section>
 
-      {/* 6. Discord RPC Section */}
+      {/* 6. Local Music Files Section */}
+      <section className="flex flex-col gap-4">
+        <div className="flex items-center gap-2 text-zinc-500 font-label-sm text-xs uppercase tracking-wider">
+          <i className="ri-folder-music-line text-base text-sky-400"></i>
+          <span>{t('settings.local_music_section')}</span>
+        </div>
+
+        <div className="neu-card-static p-4 rounded-xl border border-zinc-800/80 bg-zinc-950/40 flex flex-col gap-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="flex flex-col gap-1 max-w-lg">
+              <span className="text-sm font-semibold text-white">
+                {t('settings.local_music_title')}
+              </span>
+              <span className="text-xs text-zinc-400">
+                {t('settings.local_music_desc')}
+              </span>
+              {localMusicDir ? (
+                <div className="flex items-center gap-1.5 text-xs text-sky-400 font-mono mt-1 break-all">
+                  <i className="ri-folder-line text-sm shrink-0" />
+                  <span>{localMusicDir}</span>
+                </div>
+              ) : (
+                <span className="text-xs text-zinc-500 italic mt-0.5">
+                  {t('settings.local_folder_not_selected')}
+                </span>
+              )}
+            </div>
+
+            <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
+              <button
+                type="button"
+                onClick={handlePickFolder}
+                disabled={isScanning}
+                className="neu-button px-3.5 py-1.5 rounded-xl text-zinc-200 hover:text-white text-xs font-semibold disabled:opacity-50 flex items-center gap-1.5"
+              >
+                <i className="ri-folder-open-line text-sm" />
+                <span>{localMusicDir ? t('settings.change_folder_btn') : t('settings.choose_folder_btn')}</span>
+              </button>
+
+              {localMusicDir && (
+                <>
+                  <button
+                    type="button"
+                    onClick={handleRescanFolder}
+                    disabled={isScanning}
+                    className="neu-button px-3.5 py-1.5 rounded-xl text-zinc-200 hover:text-white text-xs font-semibold disabled:opacity-50 flex items-center gap-1.5"
+                    title={t('settings.rescan_folder_btn')}
+                  >
+                    {isScanning ? (
+                      <i className="ri-loader-4-line text-sm animate-spin" />
+                    ) : (
+                      <i className="ri-refresh-line text-sm" />
+                    )}
+                    <span>{t('settings.rescan_folder_btn')}</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={handleRemoveFolder}
+                    disabled={isScanning}
+                    className="neu-button px-3 py-1.5 rounded-xl text-red-400 hover:text-red-300 border-red-500/20 text-xs font-medium"
+                    title={t('settings.remove_folder_btn')}
+                  >
+                    <i className="ri-delete-bin-line text-sm" />
+                  </button>
+                </>
+              )}
+            </div>
+          </div>
+
+          {/* Local tracks stats row */}
+          <div className="flex items-center justify-between text-xs text-zinc-400 pt-3 border-t border-zinc-900/60 font-mono">
+            <span>{localTracks.length} {t('library.tracks')}</span>
+            {localScanMessage && (
+              <span className="text-emerald-400 font-sans">{localScanMessage}</span>
+            )}
+          </div>
+        </div>
+      </section>
+
+      {/* 7. Discord RPC Section */}
       <section className="flex flex-col gap-4">
         <div className="flex items-center gap-2 text-zinc-500 font-label-sm text-xs uppercase tracking-wider">
           <i className="ri-discord-line text-base text-indigo-400"></i>
@@ -554,29 +828,49 @@ export const SettingsPage: React.FC = () => {
         </div>
       </section>
 
-      {/* 7. Keyboard Shortcuts Cheatsheet */}
+      {/* 7. Keyboard Shortcuts & Global Media Keys */}
       <section className="flex flex-col gap-4">
         <div className="flex items-center gap-2 text-zinc-500 font-label-sm text-xs uppercase tracking-wider">
           <i className="ri-keyboard-line text-base text-amber-400"></i>
           <span>{t('settings.shortcuts_section')}</span>
         </div>
 
+        <div className="neu-card-static p-4 rounded-xl border border-zinc-800/80 bg-zinc-950/40 flex items-center justify-between">
+          <div className="flex flex-col pr-4 gap-0.5">
+            <span className="text-sm font-semibold text-white">
+              {t('settings.global_shortcuts_title')}
+            </span>
+            <span className="text-xs text-zinc-400 max-w-md">
+              {t('settings.global_shortcuts_desc')}
+            </span>
+          </div>
+
+          <Switch checked={globalShortcuts} onChange={handleToggleGlobalShortcuts} />
+        </div>
+
         <div className="neu-card-static p-4 rounded-xl border border-zinc-800/80 bg-zinc-950/40 grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div className="flex items-center justify-between p-2 rounded-lg bg-black/30 border border-zinc-900">
             <span className="text-xs text-zinc-300">{t('settings.shortcut_play_pause')}</span>
-            <kbd className="px-2 py-0.5 rounded bg-zinc-800 border border-zinc-700 text-zinc-300 font-mono text-[11px]">
-              Space
-            </kbd>
+            <div className="flex items-center gap-1">
+              <kbd className="px-2 py-0.5 rounded bg-zinc-800 border border-zinc-700 text-zinc-300 font-mono text-[11px]">
+                Space
+              </kbd>
+              <span className="text-zinc-600 text-xs">/</span>
+              <kbd className="px-1.5 py-0.5 rounded bg-zinc-800 border border-zinc-700 text-zinc-300 font-mono text-[11px]">
+                Ctrl + Alt + Space
+              </kbd>
+            </div>
           </div>
 
           <div className="flex items-center justify-between p-2 rounded-lg bg-black/30 border border-zinc-900">
             <span className="text-xs text-zinc-300">{t('settings.shortcut_next_prev')}</span>
-            <div className="flex gap-1">
+            <div className="flex items-center gap-1">
               <kbd className="px-1.5 py-0.5 rounded bg-zinc-800 border border-zinc-700 text-zinc-300 font-mono text-[11px]">
-                Alt + →
+                Alt + → / ←
               </kbd>
+              <span className="text-zinc-600 text-xs">/</span>
               <kbd className="px-1.5 py-0.5 rounded bg-zinc-800 border border-zinc-700 text-zinc-300 font-mono text-[11px]">
-                Alt + ←
+                Ctrl+Alt+→
               </kbd>
             </div>
           </div>
@@ -604,6 +898,41 @@ export const SettingsPage: React.FC = () => {
         </div>
       </section>
 
+      {/* 9. Windows Media Controls (SMTC) */}
+      <section className="flex flex-col gap-4">
+        <div className="flex items-center gap-2 text-zinc-500 font-label-sm text-xs uppercase tracking-wider">
+          <i className="ri-windows-fill text-base text-sky-400"></i>
+          <span>{t('settings.windows_media_section')}</span>
+        </div>
+
+        <div className="neu-card-static p-4 rounded-xl border border-zinc-800/80 bg-zinc-950/40 flex items-center justify-between">
+          <div className="flex flex-col pr-4 gap-0.5">
+            <span className="text-sm font-semibold text-white">
+              {t('settings.windows_media_title')}
+            </span>
+            <span className="text-xs text-zinc-400 max-w-md">
+              {t('settings.windows_media_desc')}
+            </span>
+          </div>
+
+          <Switch checked={windowsMediaControlsState} onChange={handleToggleWindowsMediaControls} />
+        </div>
+
+        {/* Tray Mini-Player Widget Switch */}
+        <div className="neu-card-static p-4 rounded-xl border border-zinc-800/80 bg-zinc-950/40 flex items-center justify-between">
+          <div className="flex flex-col pr-4 gap-0.5">
+            <span className="text-sm font-semibold text-white">
+              {t('settings.tray_widget_title')}
+            </span>
+            <span className="text-xs text-zinc-400 max-w-md">
+              {t('settings.tray_widget_desc')}
+            </span>
+          </div>
+
+          <Switch checked={trayWidgetEnabled} onChange={handleToggleTrayWidget} />
+        </div>
+      </section>
+
       {/* 8. About Section */}
       <section className="flex flex-col gap-1 text-zinc-500 pt-2 border-t border-zinc-900">
         <span className="text-xs font-semibold text-zinc-400">
@@ -613,6 +942,18 @@ export const SettingsPage: React.FC = () => {
           {t('settings.version')}
         </span>
       </section>
+
+      {/* Import Playlist Modal */}
+      <ImportPlaylistModal
+        isOpen={isImportModalOpen}
+        onClose={() => setIsImportModalOpen(false)}
+      />
+
+      {/* Deduplicator Modal */}
+      <DeduplicatorModal
+        isOpen={isDeduplicatorOpen}
+        onClose={() => setIsDeduplicatorOpen(false)}
+      />
     </div>
   );
 };

@@ -1,14 +1,28 @@
 import { createContext, useContext } from 'react';
 import type { AudioSource, Track } from '../../track/model/types';
+import type { PlayerStatus } from './player-state-machine';
 
 export type RepeatMode = 'off' | 'track' | 'queue';
 
+export interface PlayerProgressContextValue {
+  currentTime: number;
+  duration: number;
+}
+
+export const PlayerProgressContext = createContext<PlayerProgressContextValue>({
+  currentTime: 0,
+  duration: 0,
+});
+
+export const usePlayerProgress = (): PlayerProgressContextValue => {
+  return useContext(PlayerProgressContext);
+};
+
 export interface PlayerContextValue {
+  playerStatus: PlayerStatus;
   currentTrack: Track | null;
   isPlaying: boolean;
   isBuffering: boolean;
-  currentTime: number;
-  duration: number;
   volume: number;
   isMuted: boolean;
   isShuffle: boolean;
@@ -20,11 +34,13 @@ export interface PlayerContextValue {
   isLyricsOpen: boolean;
   isWaveMode: boolean;
   setWaveMode: (enabled: boolean) => void;
+  startWave: (vibe?: string) => Promise<void>;
   playTrack: (track: Track, newQueue?: Track[]) => Promise<void>;
   playTrackAtIndex: (index: number) => Promise<void>;
   togglePlayPause: () => void;
-  nextTrack: () => void;
+  nextTrack: (forceSkipRepeat?: boolean | unknown) => void;
   previousTrack: () => void;
+  dislikeTrack: (track: Track) => void;
   seekTo: (seconds: number) => void;
   setVolume: (volume: number) => void;
   toggleMute: () => void;
@@ -37,6 +53,8 @@ export interface PlayerContextValue {
   toggleQueueOpen: () => void;
   toggleLyricsOpen: () => void;
   setLyricsOpen: (open: boolean) => void;
+  playbackError: string | null;
+  clearPlaybackError: () => void;
 }
 
 export const PlayerContext = createContext<PlayerContextValue | null>(null);

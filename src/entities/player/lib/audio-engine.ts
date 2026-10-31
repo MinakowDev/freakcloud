@@ -1,4 +1,5 @@
 import { tauriApi } from '../../../shared/api/tauri-client';
+import { PLAYER_CONFIG } from '../../../shared/config';
 
 export type AudioEngineStatus = 'idle' | 'buffering' | 'playing' | 'paused' | 'ended' | 'error';
 
@@ -13,16 +14,18 @@ export class AudioEngine {
   private listeners: AudioEngineListeners = {};
   private currentTime = 0;
   private duration = 0;
-  private masterVolume = 0.8;
+  private masterVolume: number = PLAYER_CONFIG.DEFAULT_INITIAL_VOLUME;
   private isMuted = false;
   private unlisteners: Array<() => void> = [];
 
   // Fallback HTML5 audio for non-Tauri browser environments
   private fallbackAudio: HTMLAudioElement | null = null;
 
-  constructor() {
+  constructor(initialVolume: number = PLAYER_CONFIG.DEFAULT_INITIAL_VOLUME) {
+    this.masterVolume = Math.max(0, Math.min(initialVolume, 1));
     if (tauriApi.isTauri()) {
       this.initTauriListeners();
+      tauriApi.playerSetVolume(this.masterVolume).catch(() => {});
     } else {
       this.initFallbackAudio();
     }
@@ -151,6 +154,36 @@ export class AudioEngine {
     }
   }
 
+  /**
+   * Restarts current track from the beginning and plays immediately.
+   */
+  public async replay(): Promise<void> {
+    this.currentTime = 0;
+
+    if (tauriApi.isTauri()) {
+      try {
+        await tauriApi.playerSeek(0);
+        await tauriApi.playerPlay();
+        this.listeners.onStatusChange?.('playing');
+      } catch (err) {
+        console.warn('[AudioEngine] replay error:', err);
+        throw err;
+      }
+      return;
+    }
+
+    if (this.fallbackAudio) {
+      this.fallbackAudio.currentTime = 0;
+      try {
+        await this.fallbackAudio.play();
+        this.listeners.onStatusChange?.('playing');
+      } catch (err) {
+        console.warn('[AudioEngine] Fallback replay error:', err);
+        throw err;
+      }
+    }
+  }
+
   public pause(): void {
     if (tauriApi.isTauri()) {
       tauriApi.playerPause().catch((err) => console.warn('[AudioEngine] pause error:', err));
@@ -179,7 +212,7 @@ export class AudioEngine {
   }
 
   public setVolume(volume: number): void {
-    this.masterVolume = Math.max(0, Math.min(volume, 1));
+    this.masterVolume = Math.max(0, Math.min(volume, 2));
 
     if (tauriApi.isTauri()) {
       tauriApi
@@ -189,7 +222,7 @@ export class AudioEngine {
     }
 
     if (this.fallbackAudio) {
-      this.fallbackAudio.volume = this.effectiveVolume();
+      this.fallbackAudio.volume = Math.max(0, Math.min(this.effectiveVolume(), 1));
     }
   }
 

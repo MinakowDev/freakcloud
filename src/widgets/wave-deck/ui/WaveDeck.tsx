@@ -1,16 +1,11 @@
 import React, { useState } from 'react';
 import { usePlayer } from '../../../entities/player/model/player-context';
-import { useCache } from '../../../entities/track/model/cache-context';
-import { useLikes } from '../../../entities/track/model/likes-context';
 import { useTranslation } from '../../../shared/lib/i18n';
-import { generatePersonalWave } from '../../../entities/track/lib/wave-algorithm';
 import './WaveDeck.css';
 
 export const WaveDeck: React.FC = () => {
   const { messages } = useTranslation();
-  const { isPlaying, playTrack, togglePlayPause, isWaveMode, setWaveMode } = usePlayer();
-  const { cachedTracks } = useCache();
-  const { likedTracks, soundCloudTracks } = useLikes();
+  const { isPlaying, togglePlayPause, isWaveMode, startWave } = usePlayer();
 
   const [isLoadingWave, setIsLoadingWave] = useState(false);
 
@@ -23,12 +18,7 @@ export const WaveDeck: React.FC = () => {
 
     try {
       setIsLoadingWave(true);
-      const waveTracks = await generatePersonalWave('discover', likedTracks, cachedTracks, soundCloudTracks);
-
-      if (waveTracks.length > 0) {
-        await playTrack(waveTracks[0], waveTracks);
-        setWaveMode(true);
-      }
+      await startWave();
     } catch (err) {
       console.error('[WaveDeck] Failed to generate wave:', err);
     } finally {

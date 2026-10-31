@@ -120,4 +120,23 @@ a:focus-visible {
   contain-intrinsic-size: 0 48px;
 }
 
+.queue-row-virtualized {
+  content-visibility: auto;
+  contain-intrinsic-size: 0 40px;
+}
+
+/* Vinyl record smooth spinning animation */
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.vinyl-disc {
+  animation: spin 8s linear infinite;
+}
+
 

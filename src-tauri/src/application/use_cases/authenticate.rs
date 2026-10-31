@@ -21,9 +21,21 @@ impl AuthenticateUseCase {
 
     /// Вход с OAuth-токеном SoundCloud
     pub async fn login_with_token(&self, token: &str) -> Result<Session, DomainError> {
+        self.login_with_token_and_client_id(token, None).await
+    }
+
+    /// Вход с OAuth-токеном SoundCloud и опциональным client_id из браузера
+    pub async fn login_with_token_and_client_id(&self, token: &str, client_id: Option<&str>) -> Result<Session, DomainError> {
         let clean_token = token.trim();
         if clean_token.is_empty() {
             return Err(DomainError::InvalidToken);
+        }
+
+        if let Some(cid) = client_id {
+            let clean_cid = cid.trim();
+            if !clean_cid.is_empty() {
+                let _ = self.gateway.set_client_id(Some(clean_cid.to_string())).await;
+            }
         }
 
         // Проверяем токен, применив его к клиенту и запросив профиль

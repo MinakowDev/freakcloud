@@ -1,4 +1,5 @@
 import type { Track } from '../model/types';
+import { STORAGE_KEYS } from '../../../shared/config';
 import {
   cleanTrackTitle,
   extractCanonicalArtist,
@@ -28,7 +29,7 @@ export interface TasteGraphData {
   };
 }
 
-const STORAGE_KEY = 'freakcloud_taste_graph';
+const STORAGE_KEY = STORAGE_KEYS.TASTE_GRAPH;
 const CURRENT_VERSION = 1;
 const MAX_RECENT_TRACKS = 200;
 const MAX_ARTIST_NODES = 120;
@@ -274,7 +275,7 @@ function updateNode(
   };
 }
 
-const RECENT_TRACKS_KEY = 'freakcloud_recent_tracks';
+const RECENT_TRACKS_KEY = STORAGE_KEYS.RECENT_TRACKS;
 
 export function getRecentPlayedTracks(): Track[] {
   try {
@@ -290,7 +291,15 @@ export function saveRecentPlayedTrack(track: Track): void {
   try {
     const list = getRecentPlayedTracks().filter((t) => t.id !== track.id);
     list.unshift(track);
-    localStorage.setItem(RECENT_TRACKS_KEY, JSON.stringify(list.slice(0, 100)));
+    localStorage.setItem(RECENT_TRACKS_KEY, JSON.stringify(list.slice(0, 150)));
+    window.dispatchEvent(new Event('freakcloud_history_updated'));
+  } catch {}
+}
+
+export function clearRecentPlayedTracks(): void {
+  try {
+    localStorage.removeItem(RECENT_TRACKS_KEY);
+    window.dispatchEvent(new Event('freakcloud_history_updated'));
   } catch {}
 }
 

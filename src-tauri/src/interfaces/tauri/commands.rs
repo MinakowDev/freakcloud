@@ -1,12 +1,24 @@
 use tauri::{AppHandle, Manager, State, WebviewUrl, WebviewWindowBuilder};
 
 use crate::{
-    application::AppState,
+    application::{
+        use_cases::{GenerateWaveBatchInput, ImportSummary},
+        AppState,
+    },
     domain::{
         errors::DomainError,
-        models::{AudioSource, CacheStats, PaginatedTracks, Playlist, Session, Track},
+        models::{AudioSource, CacheStats, PaginatedTracks, Playlist, Session, Track, TrackSource},
     },
+    infrastructure::importer::ExternalPlaylistMeta,
 };
+
+#[tauri::command]
+pub async fn generate_wave_batch(
+    state: State<'_, AppState>,
+    input: GenerateWaveBatchInput,
+) -> Result<Vec<Track>, DomainError> {
+    state.generate_wave_batch.execute(input).await
+}
 
 #[tauri::command]
 pub async fn search_tracks(
@@ -22,8 +34,10 @@ pub async fn search_tracks(
 pub async fn get_track_stream(
     state: State<'_, AppState>,
     track_id: u64,
+    source: Option<TrackSource>,
+    external_id: Option<String>,
 ) -> Result<AudioSource, DomainError> {
-    state.get_track_stream.execute(track_id).await
+    state.get_track_stream.execute(track_id, source, external_id).await
 }
 
 #[tauri::command]
@@ -401,3 +415,103 @@ pub async fn open_log_dir(app: AppHandle) -> Result<(), DomainError> {
 
     Ok(())
 }
+
+#[tauri::command]
+pub async fn preview_external_playlist(
+    state: State<'_, AppState>,
+    input: String,
+    custom_title: Option<String>,
+) -> Result<ExternalPlaylistMeta, DomainError> {
+    state.import_playlist.preview(&input, custom_title).await
+}
+
+#[tauri::command]
+pub async fn import_external_playlist(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    meta: ExternalPlaylistMeta,
+) -> Result<ImportSummary, DomainError> {
+    state.import_playlist.execute(&app, meta).await
+}
+
+#[tauri::command]
+pub fn cancel_import_playlist(
+    state: State<'_, AppState>,
+) -> Result<(), ()> {
+    state.import_playlist.cancel();
+    Ok(())
+}
+
+#[tauri::command]
+pub fn set_tray_pinned(
+    state: State<'_, AppState>,
+    pinned: bool,
+) -> Result<(), ()> {
+    state.tray_pinned.store(pinned, std::sync::atomic::Ordering::Relaxed);
+    Ok(())
+}
+
+#[tauri::command]
+pub fn is_tray_pinned(
+    state: State<'_, AppState>,
+) -> Result<bool, ()> {
+    Ok(state.tray_pinned.load(std::sync::atomic::Ordering::Relaxed))
+}
+
+#[tauri::command]
+pub fn set_global_shortcuts_enabled(
+    state: State<'_, AppState>,
+    enabled: bool,
+) -> Result<(), ()> {
+    state.global_shortcuts_enabled.store(enabled, std::sync::atomic::Ordering::Relaxed);
+    Ok(())
+}
+
+#[tauri::command]
+pub fn is_global_shortcuts_enabled(
+    state: State<'_, AppState>,
+) -> Result<bool, ()> {
+    Ok(state.global_shortcuts_enabled.load(std::sync::atomic::Ordering::Relaxed))
+}
+
+#[tauri::command]
+pub fn set_tray_widget_enabled(
+    app: tauri::AppHandle,
+    state: State<'_, AppState>,
+    enabled: bool,
+) -> Result<(), ()> {
+    state.tray_widget_enabled.store(enabled, std::sync::atomic::Ordering::Relaxed);
+    if !enabled {
+        use tauri::Manager;
+        if let Some(tray_win) = app.get_webview_window("tray-widget") {
+            let _ = tray_win.hide();
+        }
+    }
+    Ok(())
+}
+
+#[tauri::command]
+pub fn is_tray_widget_enabled(
+    state: State<'_, AppState>,
+) -> Result<bool, ()> {
+    Ok(state.tray_widget_enabled.load(std::sync::atomic::Ordering::Relaxed))
+}
+
+#[tauri::command]
+pub async fn scan_local_folder(path: String) -> Result<Vec<crate::domain::models::Track>, DomainError> {
+    let p = std::path::Path::new(&path);
+    if !p.exists() || !p.is_dir() {
+        return Err(DomainError::Storage(format!("Directory does not exist: {}", path)));
+    }
+    let tracks = crate::infrastructure::audio::scan_directory(p, 4);
+    log::info!("[LocalScanner] Found {} audio files in {}", tracks.len(), path);
+    Ok(tracks)
+}
+
+#[tauri::command]
+pub async fn pick_local_music_folder(app: AppHandle) -> Result<Option<String>, DomainError> {
+    use tauri_plugin_dialog::DialogExt;
+    let folder = app.dialog().file().blocking_pick_folder();
+    Ok(folder.map(|f| f.to_string()))
+}
+

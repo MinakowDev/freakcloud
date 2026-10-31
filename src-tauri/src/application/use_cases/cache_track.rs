@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use crate::domain::{
     errors::DomainError,
-    models::Track,
+    models::{Track, TrackSource},
     ports::{AudioCacheGateway, SoundCloudGateway},
 };
 
@@ -12,7 +12,10 @@ pub struct CacheTrackUseCase {
 }
 
 impl CacheTrackUseCase {
-    pub fn new(gateway: Arc<dyn SoundCloudGateway>, audio_cache: Arc<dyn AudioCacheGateway>) -> Self {
+    pub fn new(
+        gateway: Arc<dyn SoundCloudGateway>,
+        audio_cache: Arc<dyn AudioCacheGateway>,
+    ) -> Self {
         Self {
             gateway,
             audio_cache,
@@ -20,15 +23,17 @@ impl CacheTrackUseCase {
     }
 
     pub async fn execute(&self, track: Track) -> Result<String, DomainError> {
-        // Если уже в кэше, сразу возвращаем путь
         if let Some(path) = self.audio_cache.get_cached_path(track.id).await? {
+            log::info!("[CacheTrack] Track {} already cached", track.id);
             return Ok(path);
         }
 
-        // Получаем URL аудиопотока
-        let stream_url = self.gateway.resolve_stream_url(track.id).await?;
+        let stream_url = match track.source {
+            TrackSource::SoundCloud => self.gateway.resolve_stream_url(track.id).await?,
+            TrackSource::YouTube => return Err(DomainError::Unexpected("YouTube Music removed".to_string())),
+            TrackSource::Local => return Ok(track.external_id),
+        };
 
-        // Скачиваем и кэшируем
         self.audio_cache.download_and_cache(&track, &stream_url).await
     }
 

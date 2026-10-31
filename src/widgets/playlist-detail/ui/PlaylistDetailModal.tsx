@@ -9,8 +9,10 @@ import { tauriApi } from '../../../shared/api/tauri-client';
 import { useArtist } from '../../../entities/artist/model/artist-context';
 import { entityCache } from '../../../shared/lib/entity-cache';
 import { useTranslation } from '../../../shared/lib/i18n';
+import { useConfirm } from '../../../shared/lib/confirm-context';
 import { PlaylistCover } from '../../playlist-card/ui/PlaylistCover';
 import { formatDurationMs } from '../../../entities/track/lib/format-time';
+import { SourceIcon } from '../../../shared/ui/SourceIcon';
 
 interface PlaylistDetailModalProps {
   playlist: Playlist | null;
@@ -36,6 +38,7 @@ export const PlaylistDetailModal: React.FC<PlaylistDetailModalProps> = ({
   const { cacheTrack } = useCache();
   const { openArtist } = useArtist();
   const { t } = useTranslation();
+  const confirm = useConfirm();
 
   const [tracks, setTracks] = useState<Track[]>([]);
   const [isLoadingTracks, setIsLoadingTracks] = useState(false);
@@ -53,7 +56,8 @@ export const PlaylistDetailModal: React.FC<PlaylistDetailModalProps> = ({
 
   const playlistId = playlist?.id;
   const isSaved = playlistId ? isPlaylistSaved(playlistId) : false;
-  const isCustom = Boolean(playlist && !playlist.is_album && (playlist.author === 'Вы' || isSaved));
+  const isSmart = Boolean(playlist && playlist.id < 0);
+  const isCustom = Boolean(playlist && !playlist.is_album && !isSmart && (playlist.author === 'Вы' || isSaved));
 
   useEffect(() => {
     if (!isOpen || !playlist) {
@@ -68,9 +72,9 @@ export const PlaylistDetailModal: React.FC<PlaylistDetailModalProps> = ({
 
     setCustomTitle(playlist.title);
 
-    // 1. If playlist prop already has tracks, use them & update cache
-    if (playlist.tracks && playlist.tracks.length > 0) {
-      setTracks(playlist.tracks);
+    // 1. If playlist prop already has tracks or is a smart/local playlist, use them & update cache
+    if (playlist.tracks !== undefined || playlist.id < 0) {
+      setTracks(playlist.tracks || []);
       entityCache.setCachedPlaylist(playlist.id, playlist);
       return;
     }
@@ -226,7 +230,14 @@ export const PlaylistDetailModal: React.FC<PlaylistDetailModalProps> = ({
   };
 
   const handleDeletePlaylist = async () => {
-    if (window.confirm(t('settings.delete_playlist_confirm'))) {
+    const ok = await confirm({
+      title: t('playlist.delete_title'),
+      message: t('settings.delete_playlist_confirm'),
+      confirmText: t('common.delete'),
+      cancelText: t('common.cancel'),
+      isDanger: true,
+    });
+    if (ok) {
       try {
         await deleteCustomPlaylist(playlist.id);
         onClose();
@@ -268,6 +279,13 @@ export const PlaylistDetailModal: React.FC<PlaylistDetailModalProps> = ({
                 <span className="text-xs text-zinc-400 font-mono">
                   {tracks.length} {t('library.tracks')} • {totalDurationMinutes} мин
                 </span>
+                <span className="text-zinc-600 text-xs">•</span>
+                <SourceIcon
+                  source={dynamicPlaylist.source}
+                  fallbackText={`${dynamicPlaylist.permalink_url || ''} ${dynamicPlaylist.author || ''}`}
+                  showLabel
+                  size="xs"
+                />
               </div>
 
               {/* Title with In-place Edit */}
@@ -345,7 +363,7 @@ export const PlaylistDetailModal: React.FC<PlaylistDetailModalProps> = ({
                 </button>
 
                 {/* Save icon button for non-custom playlists */}
-                {!isCustom && (
+                {!isCustom && !isSmart && (
                   <button
                     type="button"
                     onClick={handleToggleSave}

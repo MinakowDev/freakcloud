@@ -8,15 +8,22 @@ import { TrackTable } from '../../../widgets/track-list/ui/TrackTable';
 import { PlaylistCard } from '../../../widgets/playlist-card/ui/PlaylistCard';
 import { PlaylistDetailModal } from '../../../widgets/playlist-detail/ui/PlaylistDetailModal';
 import { CreatePlaylistModal } from '../../../widgets/playlist-action/ui/CreatePlaylistModal';
+import { ImportPlaylistModal } from '../../../widgets/import-playlist';
 import { ArtistCard } from '../../../widgets/artist-card/ui/ArtistCard';
 import { useArtist } from '../../../entities/artist/model/artist-context';
 import { loadTasteGraph, getEffectiveWeight } from '../../../entities/track/lib/taste-graph';
+import { SmartPlaylistsSection } from '../../../widgets/smart-playlists';
+import { DeduplicatorModal } from '../../../widgets/deduplicator';
 import { useTranslation } from '../../../shared/lib/i18n';
 import './LibraryGlider.css';
 
 type LibraryTab = 'soundcloud' | 'my-likes' | 'cached' | 'albums' | 'artists' | 'playlists';
 
-export const LibraryPage: React.FC = () => {
+export interface LibraryPageProps {
+  onNavigate?: (page: 'settings') => void;
+}
+
+export const LibraryPage: React.FC<LibraryPageProps> = ({ onNavigate }) => {
   const { cachedTracks, refreshCache } = useCache();
   const {
     likedTracks,
@@ -37,6 +44,8 @@ export const LibraryPage: React.FC = () => {
   const [selectedPlaylist, setSelectedPlaylist] = useState<Playlist | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false);
+  const [isDeduplicatorOpen, setIsDeduplicatorOpen] = useState(false);
 
   // Infinite scroll sentinel ref for SoundCloud tab
   const infiniteScrollSentinelRef = useRef<HTMLDivElement | null>(null);
@@ -623,8 +632,14 @@ export const LibraryPage: React.FC = () => {
         </div>
       ) : (
         /* Плейлисты */
-        <div className="flex flex-col gap-4 animate-cascade" style={{ animationDelay: '60ms' }}>
-          <div className="flex items-center justify-between">
+        <div className="flex flex-col gap-6 animate-cascade" style={{ animationDelay: '60ms' }}>
+          {/* Смарт-плейлисты */}
+          <SmartPlaylistsSection
+            onOpenDetails={handleOpenDetails}
+            onNavigateToSettings={onNavigate ? () => onNavigate('settings') : undefined}
+          />
+
+          <div className="flex items-center justify-between pt-2 border-t border-zinc-900/80">
             <div className="flex items-center gap-2">
               <span className="font-headline-sm text-base text-white font-semibold">
                 {messages.library.playlists_title || 'Ваши сохранённые плейлисты'}
@@ -632,14 +647,35 @@ export const LibraryPage: React.FC = () => {
               <span className="text-xs text-zinc-500 font-mono">({customPlaylists.length})</span>
             </div>
 
-            <button
-              type="button"
-              onClick={() => setIsCreateModalOpen(true)}
-              className="neu-button-primary px-3.5 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 shadow-sm"
-            >
-              <i className="ri-add-line text-sm"></i>
-              <span>{messages.library.create_playlist || 'Создать плейлист'}</span>
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setIsDeduplicatorOpen(true)}
+                className="px-3.5 py-1.5 rounded-xl text-xs font-medium flex items-center gap-1.5 bg-zinc-900/80 border border-zinc-800/80 hover:border-zinc-700 hover:bg-zinc-800 text-zinc-300 hover:text-white transition-colors cursor-pointer"
+                title={messages.deduplicator?.open_btn_title || 'Поиск и очистка дубликатов'}
+              >
+                <i className="ri-file-copy-2-line text-sm text-zinc-400" />
+                <span>{messages.deduplicator?.open_btn || 'Дубликаты'}</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setIsImportModalOpen(true)}
+                className="px-3.5 py-1.5 rounded-xl text-xs font-medium flex items-center gap-1.5 bg-zinc-900/80 border border-zinc-800/80 hover:border-zinc-700 hover:bg-zinc-800 text-zinc-300 hover:text-white transition-colors cursor-pointer"
+              >
+                <i className="ri-download-cloud-2-line text-sm text-zinc-400"></i>
+                <span>{messages.import?.import_action || 'Импорт'}</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setIsCreateModalOpen(true)}
+                className="px-3.5 py-1.5 rounded-xl text-xs font-medium flex items-center gap-1.5 bg-zinc-900 border border-zinc-800 hover:border-zinc-700 hover:bg-zinc-800 text-zinc-300 hover:text-white transition-colors cursor-pointer shadow-sm"
+              >
+                <i className="ri-add-line text-sm text-zinc-400"></i>
+                <span>{messages.library.create_playlist || 'Создать плейлист'}</span>
+              </button>
+            </div>
           </div>
 
           {/* Playlists Grid or Empty State */}
@@ -653,17 +689,27 @@ export const LibraryPage: React.FC = () => {
                   {messages.library.empty_playlists_title || 'У вас пока нет плейлистов'}
                 </p>
                 <p className="font-body-sm text-xs text-zinc-500 leading-relaxed">
-                  Создайте свой первый плейлист и собирайте любимую музыку SoundCloud в одном месте.
+                  Создайте свой первый плейлист или импортируйте любимую музыку из Spotify или Яндекс Музыки.
                 </p>
               </div>
-              <button
-                type="button"
-                onClick={() => setIsCreateModalOpen(true)}
-                className="neu-button-primary px-5 py-2 rounded-xl text-xs font-semibold flex items-center gap-2"
-              >
-                <i className="ri-add-line text-sm" />
-                <span>Создать свой первый плейлист</span>
-              </button>
+              <div className="flex items-center gap-2.5">
+                <button
+                  type="button"
+                  onClick={() => setIsImportModalOpen(true)}
+                  className="px-4 py-2 rounded-xl text-xs font-medium flex items-center gap-2 bg-zinc-900/80 border border-zinc-800/80 hover:border-zinc-700 hover:bg-zinc-800 text-zinc-300 hover:text-white transition-colors cursor-pointer"
+                >
+                  <i className="ri-download-cloud-2-line text-sm text-zinc-400" />
+                  <span>{messages.import?.modal_title || 'Импорт музыки'}</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIsCreateModalOpen(true)}
+                  className="px-4 py-2 rounded-xl text-xs font-medium flex items-center gap-2 bg-zinc-900 border border-zinc-800 hover:border-zinc-700 hover:bg-zinc-800 text-zinc-300 hover:text-white transition-colors cursor-pointer shadow-sm"
+                >
+                  <i className="ri-add-line text-sm text-zinc-400" />
+                  <span>Создать свой первый плейлист</span>
+                </button>
+              </div>
             </div>
           ) : (
             <div className="grid grid-cols-[repeat(auto-fill,minmax(180px,1fr))] gap-4">
@@ -686,11 +732,30 @@ export const LibraryPage: React.FC = () => {
         onCreateSuccess={handleCreateSuccess}
       />
 
+      {/* Import Playlist Modal */}
+      <ImportPlaylistModal
+        isOpen={isImportModalOpen}
+        onClose={() => setIsImportModalOpen(false)}
+        onOpenPlaylist={(id) => {
+          const pl = savedPlaylists.find((p) => p.id === id);
+          if (pl) {
+            setSelectedPlaylist(pl);
+            setIsModalOpen(true);
+          }
+        }}
+      />
+
       {/* Playlist Details Modal */}
       <PlaylistDetailModal
         playlist={selectedPlaylist}
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
+      />
+
+      {/* Deduplicator Modal */}
+      <DeduplicatorModal
+        isOpen={isDeduplicatorOpen}
+        onClose={() => setIsDeduplicatorOpen(false)}
       />
     </div>
   );

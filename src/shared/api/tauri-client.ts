@@ -1,5 +1,5 @@
 import { invoke, convertFileSrc } from '@tauri-apps/api/core';
-import type { AudioSource, CacheStats, Track } from '../../entities/track/model/types';
+import type { AudioSource, CacheStats, Track, TrackSource } from '../../entities/track/model/types';
 import type { Session } from '../../entities/session/model/types';
 import type { Playlist } from '../../entities/playlist/model/types';
 
@@ -38,8 +38,22 @@ const DEFAULT_CACHE_STATS: CacheStats = {
   total_size_bytes: 0,
 };
 
+export interface GenerateWaveBatchInput {
+  vibe?: string;
+  current_track_id?: number;
+  seed_track_ids?: number[];
+  exclude_track_ids?: number[];
+  disliked_genres?: string[];
+  disliked_artists?: string[];
+  limit?: number;
+}
+
 export const tauriApi = {
   isTauri,
+
+  generateWaveBatch: async (input: GenerateWaveBatchInput): Promise<Track[]> => {
+    return safeInvoke<Track[]>('generate_wave_batch', { input }, []);
+  },
 
   searchTracks: async (query: string, limit = 30, offset = 0): Promise<Track[]> => {
     return safeInvoke<Track[]>('search_tracks', { query, limit, offset }, []);
@@ -73,10 +87,10 @@ export const tauriApi = {
     return safeInvoke<boolean>('is_playlist_saved', { playlistId }, false);
   },
 
-  getTrackStream: async (trackId: number): Promise<AudioSource> => {
+  getTrackStream: async (trackId: number, source?: TrackSource, externalId?: string): Promise<AudioSource> => {
     return safeInvoke<AudioSource>(
       'get_track_stream',
-      { trackId },
+      { trackId, source, externalId },
       { url: '', is_local: false }
     );
   },
@@ -264,6 +278,56 @@ export const tauriApi = {
   openLogDir: async (): Promise<void> => {
     return safeInvoke<void>('open_log_dir');
   },
+
+  previewExternalPlaylist: async (input: string, customTitle?: string): Promise<ExternalPlaylistMeta> => {
+    return safeInvoke<ExternalPlaylistMeta>('preview_external_playlist', { input, customTitle });
+  },
+
+  importExternalPlaylist: async (meta: ExternalPlaylistMeta): Promise<ImportSummary> => {
+    return safeInvoke<ImportSummary>('import_external_playlist', { meta });
+  },
+
+  cancelImportPlaylist: async (): Promise<void> => {
+    return safeInvoke<void>('cancel_import_playlist');
+  },
+
+  setTrayPinned: async (pinned: boolean): Promise<void> => {
+    return safeInvoke<void>('set_tray_pinned', { pinned });
+  },
+
+  isTrayPinned: async (): Promise<boolean> => {
+    return safeInvoke<boolean>('is_tray_pinned', {}, false);
+  },
+
+  setTrayWidgetEnabled: async (enabled: boolean): Promise<void> => {
+    return safeInvoke<void>('set_tray_widget_enabled', { enabled });
+  },
+
+  isTrayWidgetEnabled: async (): Promise<boolean> => {
+    return safeInvoke<boolean>('is_tray_widget_enabled', {}, true);
+  },
+
+  setGlobalShortcutsEnabled: async (enabled: boolean): Promise<void> => {
+    return safeInvoke<void>('set_global_shortcuts_enabled', { enabled });
+  },
+
+  isGlobalShortcutsEnabled: async (): Promise<boolean> => {
+    return safeInvoke<boolean>('is_global_shortcuts_enabled', {}, true);
+  },
+
+  scanLocalFolder: async (path: string): Promise<Track[]> => {
+    return safeInvoke<Track[]>('scan_local_folder', { path }, []);
+  },
+
+  pickLocalMusicFolder: async (): Promise<string | null> => {
+    return safeInvoke<string | null>('pick_local_music_folder', {}, null);
+  },
+
+  onImportProgress: async (callback: (payload: ImportProgressPayload) => void): Promise<(() => void) | undefined> => {
+    if (!isTauri()) return undefined;
+    const { listen } = await import('@tauri-apps/api/event');
+    return listen<ImportProgressPayload>('import:progress', (e) => callback(e.payload));
+  },
 };
 
 export interface AudioPlayerState {
@@ -283,3 +347,34 @@ export interface DiscordRpcPayload {
   current_time_sec: number;
   duration_sec: number;
 }
+
+export interface ExternalTrackMeta {
+  title: string;
+  artist: string;
+  duration_ms?: number;
+}
+
+export interface ExternalPlaylistMeta {
+  service: string;
+  title: string;
+  description?: string;
+  cover_url?: string;
+  tracks: ExternalTrackMeta[];
+}
+
+export interface ImportProgressPayload {
+  current: number;
+  total: number;
+  matched: number;
+  current_track: string;
+}
+
+export interface ImportSummary {
+  playlist_id?: number;
+  title: string;
+  total_tracks: number;
+  matched_tracks: number;
+  unmatched: ExternalTrackMeta[];
+  cancelled?: boolean;
+}
+

@@ -117,19 +117,19 @@ export const CreatePlaylistModal: React.FC<CreatePlaylistModalProps> = ({
             <button
               type="button"
               onClick={onClose}
-              className="neu-button px-4 py-2 rounded-xl text-xs font-semibold text-zinc-400 hover:text-white"
+              className="px-4 py-2 rounded-xl text-xs font-medium text-zinc-400 hover:text-white bg-zinc-900 border border-zinc-800 hover:border-zinc-700 transition-colors cursor-pointer"
             >
               Отмена
             </button>
             <button
               type="submit"
               disabled={!title.trim() || isSubmitting}
-              className="neu-button-primary px-5 py-2 rounded-xl text-xs font-semibold flex items-center gap-2 disabled:opacity-40 disabled:pointer-events-none"
+              className="px-4 py-2 rounded-xl text-xs font-medium flex items-center gap-2 bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 hover:border-zinc-600 text-zinc-200 hover:text-white transition-colors disabled:opacity-40 disabled:pointer-events-none cursor-pointer"
             >
               {isSubmitting ? (
                 <i className="ri-loader-4-line text-sm animate-spin" />
               ) : (
-                <i className="ri-check-line text-sm" />
+                <i className="ri-check-line text-sm text-zinc-400" />
               )}
               <span>{t('library.create_playlist')}</span>
             </button>

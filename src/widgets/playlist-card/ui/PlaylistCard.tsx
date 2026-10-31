@@ -7,6 +7,7 @@ import { useTranslation } from '../../../shared/lib/i18n';
 import { useArtist } from '../../../entities/artist/model/artist-context';
 import { entityCache } from '../../../shared/lib/entity-cache';
 import { PlaylistCover } from './PlaylistCover';
+import { SourceIcon } from '../../../shared/ui/SourceIcon';
 
 interface PlaylistCardProps {
   playlist: Playlist;
@@ -111,6 +112,15 @@ export const PlaylistCard: React.FC<PlaylistCardProps> = ({ playlist, onOpenDeta
           </button>
         </div>
 
+        {/* Source icon indicator */}
+        <div className="absolute top-2.5 left-2.5 w-6 h-6 rounded-md bg-black/75 backdrop-blur-md flex items-center justify-center border border-white/10 shadow-sm">
+          <SourceIcon
+            source={playlist.source}
+            fallbackText={`${playlist.permalink_url || ''} ${playlist.author || ''}`}
+            size="xs"
+          />
+        </div>
+
         {/* Track count indicator */}
         <div className="absolute bottom-2.5 right-2.5 px-2 py-0.5 bg-black/85 backdrop-blur-md rounded-md text-[10px] font-mono text-zinc-300 border border-white/5">
           {playlist.track_count} {messages.library.tracks_count || 'треков'}
@@ -135,10 +145,17 @@ export const PlaylistCard: React.FC<PlaylistCardProps> = ({ playlist, onOpenDeta
             {playlist.author}
           </button>
         ) : null}
-        <div className="flex items-center gap-2 mt-1 text-[11px] text-zinc-500 font-mono">
-          <span>{formattedDuration()}</span>
-          <span>•</span>
-          <span>{playlist.track_count} треков</span>
+        <div className="flex items-center justify-between mt-1 text-[11px] text-zinc-500 font-mono">
+          <div className="flex items-center gap-1.5">
+            <span>{formattedDuration()}</span>
+            <span>•</span>
+            <span>{playlist.track_count} треков</span>
+          </div>
+          <SourceIcon
+            source={playlist.source}
+            fallbackText={`${playlist.permalink_url || ''} ${playlist.author || ''}`}
+            size="xs"
+          />
         </div>
       </div>
     </div>

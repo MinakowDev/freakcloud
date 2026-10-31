@@ -3,6 +3,7 @@ import { usePlayer } from '../../../entities/player/model/player-context';
 import { useTranslation } from '../../../shared/lib/i18n';
 import { formatDurationMs } from '../../../entities/track/lib/format-time';
 import { useArtist } from '../../../entities/artist/model/artist-context';
+import { useConfirm } from '../../../shared/lib/confirm-context';
 
 export const QueueAside: React.FC = () => {
   const {
@@ -19,6 +20,20 @@ export const QueueAside: React.FC = () => {
 
   const { messages } = useTranslation();
   const { openArtist } = useArtist();
+  const confirm = useConfirm();
+
+  const handleClearQueue = async () => {
+    const ok = await confirm({
+      title: messages.queue.clear_confirm_title,
+      message: messages.queue.clear_confirm_desc,
+      confirmText: messages.common.clear,
+      cancelText: messages.common.cancel,
+      isDanger: true,
+    });
+    if (ok) {
+      clearQueue();
+    }
+  };
 
   const pastTracks = currentIndex > 0 ? queue.slice(0, currentIndex) : [];
   const upcomingStartIndex = currentIndex >= 0 ? currentIndex + 1 : 0;
@@ -47,7 +62,7 @@ export const QueueAside: React.FC = () => {
             {upcomingTracks.length > 0 && (
               <button
                 type="button"
-                onClick={clearQueue}
+                onClick={handleClearQueue}
                 className="w-7 h-7 rounded flex items-center justify-center text-zinc-400 hover:text-white hover:bg-zinc-900 transition-colors"
                 title={messages.player.clear_queue}
               >
@@ -70,17 +85,19 @@ export const QueueAside: React.FC = () => {
         <div className="flex-1 overflow-y-auto p-space-md flex flex-col gap-space-lg">
           {/* Now Playing Section */}
           {currentTrack && (
-            <div className="flex flex-col gap-1.5">
+            <div className="flex flex-col gap-1.5 animate-cascade" style={{ animationDelay: '0ms' }}>
               <span className="font-label-sm text-[11px] text-zinc-500 uppercase tracking-wider px-1">
                 {messages.player.now_playing}
               </span>
-              <div className="flex items-center gap-3 p-2 bg-[#0c0c0e] rounded-[4px] border border-zinc-900">
+              <div className="flex items-center gap-3 p-2 bg-[#0c0c0e] rounded-[4px] border border-zinc-900 transition-colors">
                 <div className="w-10 h-10 rounded-[2px] overflow-hidden bg-zinc-900 flex-shrink-0 flex items-center justify-center">
                   {currentTrack.artwork_url ? (
                     <img
                       src={currentTrack.artwork_url}
                       alt=""
                       className="w-full h-full object-cover"
+                      loading="lazy"
+                      decoding="async"
                     />
                   ) : (
                     <i className="ri-music-2-line text-zinc-500 text-lg"></i>
@@ -122,7 +139,10 @@ export const QueueAside: React.FC = () => {
             </span>
 
             {upcomingTracks.length === 0 ? (
-              <div className="py-12 flex flex-col items-center justify-center text-center gap-2 text-zinc-600">
+              <div
+                className="py-12 flex flex-col items-center justify-center text-center gap-2 text-zinc-600 animate-cascade"
+                style={{ animationDelay: '40ms' }}
+              >
                 <i className="ri-play-list-line text-2xl text-zinc-700"></i>
                 <span className="font-body-sm text-xs text-zinc-500">
                   {messages.player.empty_queue}
@@ -135,7 +155,8 @@ export const QueueAside: React.FC = () => {
                   return (
                     <div
                       key={`${t.id}-${actualQueueIndex}`}
-                      className="flex items-center gap-2.5 p-1.5 rounded hover:bg-[#121214] transition-colors group cursor-pointer"
+                      className="queue-row-virtualized animate-cascade flex items-center gap-2.5 p-1.5 rounded hover:bg-[#121214] transition-colors group cursor-pointer"
+                      style={{ animationDelay: `${Math.min((idx + 1) * 20, 300)}ms` }}
                       onClick={() => playTrackAtIndex(actualQueueIndex)}
                     >
                       <span className="font-label-sm text-[11px] text-zinc-600 w-4 text-center group-hover:hidden">
@@ -149,6 +170,8 @@ export const QueueAside: React.FC = () => {
                             src={t.artwork_url}
                             alt=""
                             className="w-full h-full object-cover"
+                            loading="lazy"
+                            decoding="async"
                           />
                         ) : (
                           <i className="ri-disc-line text-zinc-600 text-sm"></i>
@@ -184,7 +207,7 @@ export const QueueAside: React.FC = () => {
                           e.stopPropagation();
                           removeFromQueue(actualQueueIndex);
                         }}
-                        className="w-6 h-6 rounded flex items-center justify-center text-zinc-600 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-all"
+                        className="w-6 h-6 rounded flex items-center justify-center text-zinc-600 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity duration-150"
                         title="Удалить из очереди"
                       >
                         <i className="ri-close-line text-sm"></i>
@@ -198,7 +221,10 @@ export const QueueAside: React.FC = () => {
 
           {/* Past Tracks Section */}
           {pastTracks.length > 0 && (
-            <div className="flex flex-col gap-1.5 pt-2 border-t border-zinc-900/60">
+            <div
+              className="flex flex-col gap-1.5 pt-2 border-t border-zinc-900/60 animate-cascade"
+              style={{ animationDelay: '50ms' }}
+            >
               <div className="flex items-center justify-between px-1">
                 <span className="font-label-sm text-[11px] text-zinc-500 uppercase tracking-wider">
                   {messages.player.previously_played || 'Ранее играли'} ({pastTracks.length})
@@ -209,7 +235,8 @@ export const QueueAside: React.FC = () => {
                 {pastTracks.map((t, pastIdx) => (
                   <div
                     key={`past-${t.id}-${pastIdx}`}
-                    className="flex items-center gap-2.5 p-1.5 rounded hover:bg-[#121214] transition-colors group cursor-pointer opacity-75 hover:opacity-100"
+                    className="queue-row-virtualized animate-cascade flex items-center gap-2.5 p-1.5 rounded hover:bg-[#121214] transition-colors group cursor-pointer opacity-75 hover:opacity-100"
+                    style={{ animationDelay: `${Math.min((pastIdx + 1) * 20, 300)}ms` }}
                     onClick={() => playTrackAtIndex(pastIdx)}
                     title="Слушать снова"
                   >
@@ -224,6 +251,8 @@ export const QueueAside: React.FC = () => {
                           src={t.artwork_url}
                           alt=""
                           className="w-full h-full object-cover grayscale-[20%] group-hover:grayscale-0"
+                          loading="lazy"
+                          decoding="async"
                         />
                       ) : (
                         <i className="ri-disc-line text-zinc-600 text-sm"></i>

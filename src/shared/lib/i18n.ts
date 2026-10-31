@@ -1,11 +1,12 @@
 import ru from '../../messages/ru.json';
 import en from '../../messages/en.json';
 import { useState, useEffect, useCallback } from 'react';
+import { STORAGE_KEYS } from '../config';
 
 export type Locale = 'ru' | 'en';
 type MessageSchema = typeof ru;
 
-const LOCALE_STORAGE_KEY = 'freakcloud_locale';
+const LOCALE_STORAGE_KEY = STORAGE_KEYS.LOCALE;
 const LOCALE_CHANGE_EVENT = 'freakcloud_locale_change';
 
 const dictionaries: Record<Locale, MessageSchema> = {
@@ -30,7 +31,7 @@ export function setLocale(locale: Locale) {
   }
 }
 
-export function getTranslation(path: string, locale = getCurrentLocale()): string {
+export function getTranslation(path: string, params?: Record<string, string | number>, locale = getCurrentLocale()): string {
   const parts = path.split('.');
   const dict = dictionaries[locale] || dictionaries.ru;
   let current: unknown = dict;
@@ -41,7 +42,13 @@ export function getTranslation(path: string, locale = getCurrentLocale()): strin
       return path;
     }
   }
-  return typeof current === 'string' ? current : path;
+  let text = typeof current === 'string' ? current : path;
+  if (params) {
+    Object.entries(params).forEach(([key, val]) => {
+      text = text.split(`{${key}}`).join(String(val));
+    });
+  }
+  return text;
 }
 
 export function useTranslation() {
@@ -68,7 +75,7 @@ export function useTranslation() {
   return {
     locale,
     setLocale: changeLocale,
-    t: (path: string) => getTranslation(path, locale),
+    t: (path: string, params?: Record<string, string | number>) => getTranslation(path, params, locale),
     messages,
   };
 }

@@ -41,7 +41,7 @@ export const Header: React.FC<HeaderProps> = ({
         {!session.is_authenticated && (
           <button
             onClick={openOAuthModal}
-            className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-white text-black font-body-sm text-xs font-medium hover:bg-zinc-200 transition-colors shadow-sm"
+            className="flex items-center gap-1.5 px-3 py-1 rounded-md bg-white text-black font-body-sm text-xs font-semibold hover:bg-zinc-200 transition-colors shadow-sm"
             title={messages.auth.login_btn}
           >
             <i className="ri-soundcloud-line text-base"></i>

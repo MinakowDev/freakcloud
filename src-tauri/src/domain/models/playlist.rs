@@ -13,6 +13,8 @@ pub struct Playlist {
     pub permalink_url: Option<String>,
     pub is_album: bool,
     pub tracks: Option<Vec<Track>>,
+    #[serde(default)]
+    pub source: Option<String>,
 }
 
 impl Playlist {

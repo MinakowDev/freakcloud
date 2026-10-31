@@ -1,5 +1,14 @@
 use serde::{Deserialize, Serialize};
 
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "lowercase")]
+pub enum TrackSource {
+    #[default]
+    SoundCloud,
+    YouTube,
+    Local,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Track {
     pub id: u64,
@@ -14,6 +23,10 @@ pub struct Track {
     pub likes_count: Option<u64>,
     pub genre: Option<String>,
     pub permalink_url: String,
+    /// Источник трека (SoundCloud или YouTube)
+    pub source: TrackSource,
+    /// Идентификатор в системе источника: track_id для SoundCloud
+    pub external_id: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -61,6 +74,8 @@ mod tests {
             likes_count: None,
             genre: None,
             permalink_url: "https://soundcloud.com/test".to_string(),
+            source: TrackSource::SoundCloud,
+            external_id: "1".to_string(),
         };
 
         assert_eq!(track.formatted_duration(), "03:32");
@@ -81,6 +96,8 @@ mod tests {
             likes_count: None,
             genre: None,
             permalink_url: "https://soundcloud.com/test".to_string(),
+            source: TrackSource::SoundCloud,
+            external_id: "1".to_string(),
         };
 
         assert_eq!(

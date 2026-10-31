@@ -94,7 +94,13 @@ export const TrackRow: React.FC<TrackRowProps> = React.memo(({ track, index, que
       <div className="flex items-center gap-space-md min-w-0 pr-space-sm">
         <div className="w-9 h-9 rounded bg-zinc-900 overflow-hidden flex-shrink-0 flex items-center justify-center border border-zinc-800">
           {track.artwork_url ? (
-            <img src={track.artwork_url} alt="" className="w-full h-full object-cover" />
+            <img
+              src={track.artwork_url}
+              alt=""
+              className="w-full h-full object-cover"
+              loading="lazy"
+              decoding="async"
+            />
           ) : (
             <i className="ri-music-2-line text-zinc-600 text-[18px]"></i>
           )}
@@ -121,6 +127,9 @@ export const TrackRow: React.FC<TrackRowProps> = React.memo(({ track, index, que
 
       {/* 3. Fixed Slot: Actions (Like + Playlist + Queue + Cache) (124px) */}
       <div className="flex items-center justify-center gap-1.5 w-[124px]">
+        {track.source && (
+          <i className="text-base ri-soundcloud-line text-orange-500"></i>
+        )}
         <button
           type="button"
           onClick={handleLikeClick}

@@ -1,18 +1,17 @@
-import React from 'react';
-import { usePlayer } from '../../../entities/player/model/player-context';
+import React, { useEffect } from 'react';
+import { usePlayer, usePlayerProgress } from '../../../entities/player/model/player-context';
 import { useCache } from '../../../entities/track/model/cache-context';
 import { useLikes } from '../../../entities/track/model/likes-context';
 import { formatTime } from '../../../entities/track/lib/format-time';
 import { useTranslation } from '../../../shared/lib/i18n';
 import { useArtist } from '../../../entities/artist/model/artist-context';
+import { tauriApi } from '../../../shared/api/tauri-client';
 
 export const PlayerBar: React.FC = () => {
   const {
     currentTrack,
     isPlaying,
     isBuffering,
-    currentTime,
-    duration,
     volume,
     isMuted,
     isShuffle,
@@ -21,9 +20,12 @@ export const PlayerBar: React.FC = () => {
     currentIndex,
     isQueueOpen,
     isLyricsOpen,
+    playbackError,
+    clearPlaybackError,
     togglePlayPause,
     nextTrack,
     previousTrack,
+    dislikeTrack,
     seekTo,
     setVolume,
     toggleMute,
@@ -32,11 +34,20 @@ export const PlayerBar: React.FC = () => {
     toggleQueueOpen,
     toggleLyricsOpen,
   } = usePlayer();
+  const { currentTime, duration } = usePlayerProgress();
 
   const { isCached, cacheTrack, removeCachedTrack, isDownloading } = useCache();
   const { isLiked, toggleLike } = useLikes();
   const { messages } = useTranslation();
   const { openArtist } = useArtist();
+
+  useEffect(() => {
+    if (!playbackError) return;
+    const timer = setTimeout(() => {
+      clearPlaybackError();
+    }, 8000);
+    return () => clearTimeout(timer);
+  }, [playbackError, clearPlaybackError]);
 
   const progressPercent = duration > 0 ? (currentTime / duration) * 100 : 0;
   const cached = currentTrack ? isCached(currentTrack.id) : false;
@@ -51,6 +62,12 @@ export const PlayerBar: React.FC = () => {
     }
   };
 
+  const handleDislikeClick = () => {
+    if (currentTrack) {
+      dislikeTrack(currentTrack);
+    }
+  };
+
   const handleCacheClick = () => {
     if (!currentTrack) return;
     if (cached) {
@@ -61,7 +78,35 @@ export const PlayerBar: React.FC = () => {
   };
 
   return (
-    <footer className="w-full h-[72px] bg-black border-t border-zinc-800 flex-shrink-0 px-space-lg flex items-center justify-between select-none">
+    <footer className="w-full h-[72px] bg-black border-t border-zinc-800 flex-shrink-0 px-space-lg flex items-center justify-between select-none relative">
+      {playbackError && (
+        <div className="absolute -top-10 left-1/2 -translate-x-1/2 bg-zinc-900 border border-zinc-800 text-xs px-3 py-1.5 rounded flex items-center gap-2 shadow-2xl z-50 text-zinc-300">
+          <i className="ri-error-warning-line text-amber-400 text-sm flex-shrink-0" />
+          <span>
+            {playbackError === 'drm'
+              ? messages.player.drm_protected
+              : messages.player.stream_error}
+          </span>
+          {playbackError === 'drm' && currentTrack?.permalink_url && (
+            <button
+              type="button"
+              onClick={() => tauriApi.openExternal(currentTrack.permalink_url)}
+              className="underline text-white hover:text-zinc-200 transition-colors ml-1 flex-shrink-0"
+            >
+              SoundCloud
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={clearPlaybackError}
+            className="text-zinc-400 hover:text-white transition-colors ml-1.5 flex items-center flex-shrink-0"
+            title="Закрыть"
+          >
+            <i className="ri-close-line text-sm" />
+          </button>
+        </div>
+      )}
+
       {/* 1. Track Info (Left) */}
       <div className="flex items-center gap-space-md w-1/4 min-w-[200px]">
         <div
@@ -100,6 +145,7 @@ export const PlayerBar: React.FC = () => {
               {currentTrack ? currentTrack.artist : 'freakcloud'}
             </span>
           )}
+          
         </div>
         {currentTrack && (
           <div className="flex items-center gap-1.5 ml-space-xs flex-shrink-0">
@@ -111,6 +157,14 @@ export const PlayerBar: React.FC = () => {
               title={liked ? messages.player.unlike : messages.player.like}
             >
               <i className={`${liked ? 'ri-heart-3-fill' : 'ri-heart-3-line'} text-[19px]`}></i>
+            </button>
+            <button
+              type="button"
+              onClick={handleDislikeClick}
+              className="text-zinc-400 hover:text-white transition-colors flex items-center justify-center w-7 h-7 rounded-full hover:bg-zinc-800/80"
+              title={messages.player.dislike}
+            >
+              <i className="ri-thumb-down-line text-[18px]"></i>
             </button>
             <button
               type="button"
@@ -170,7 +224,7 @@ export const PlayerBar: React.FC = () => {
 
           {/* Next */}
           <button
-            onClick={nextTrack}
+            onClick={() => nextTrack(true)}
             className="text-zinc-400 hover:text-white transition-colors flex items-center justify-center"
             title={messages.player.next}
           >

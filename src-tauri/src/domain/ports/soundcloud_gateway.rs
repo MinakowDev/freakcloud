@@ -40,6 +40,11 @@ pub trait SoundCloudGateway: Send + Sync {
     /// Установка или сброс токена авторизации в клиенте
     async fn set_auth_token(&self, token: Option<String>) -> Result<(), DomainError>;
 
+    /// Установка client_id для запросов к API SoundCloud
+    async fn set_client_id(&self, _client_id: Option<String>) -> Result<(), DomainError> {
+        Ok(())
+    }
+
     /// Добавление трека в понравившиеся
     async fn like_track(&self, track_id: u64) -> Result<(), DomainError>;
 

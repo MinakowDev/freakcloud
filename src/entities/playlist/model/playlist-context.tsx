@@ -87,6 +87,7 @@ export const PlaylistProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       track_count: 0,
       is_album: false,
       tracks: [],
+      source: 'soundcloud',
     };
     await savePlaylist(newPlaylist);
     return newPlaylist;

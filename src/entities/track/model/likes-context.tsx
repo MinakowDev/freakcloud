@@ -3,12 +3,11 @@ import type { Track } from './types';
 import { tauriApi } from '../../../shared/api/tauri-client';
 import { useSession } from '../../session/model/session-context';
 import { recordTrackLike, recordTrackUnlike } from '../lib/taste-graph';
-
-const MY_LIKES_STORAGE_KEY = 'freakcloud_my_likes';
+import { STORAGE_KEYS } from '../../../shared/config';
 
 function loadStoredMyLikes(): Track[] {
   try {
-    const raw = localStorage.getItem(MY_LIKES_STORAGE_KEY);
+    const raw = localStorage.getItem(STORAGE_KEYS.MY_LIKES);
     if (!raw) return [];
     const parsed = JSON.parse(raw);
     return Array.isArray(parsed) ? parsed : [];
@@ -20,7 +19,7 @@ function loadStoredMyLikes(): Track[] {
 
 function saveStoredMyLikes(tracks: Track[]): void {
   try {
-    localStorage.setItem(MY_LIKES_STORAGE_KEY, JSON.stringify(tracks));
+    localStorage.setItem(STORAGE_KEYS.MY_LIKES, JSON.stringify(tracks));
   } catch (err) {
     console.warn('[LikesContext] Failed to save freakcloud_my_likes:', err);
   }

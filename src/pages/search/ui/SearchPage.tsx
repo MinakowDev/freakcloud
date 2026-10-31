@@ -10,6 +10,7 @@ import { useLikes } from '../../../entities/track/model/likes-context';
 import { useCache } from '../../../entities/track/model/cache-context';
 import { loadTasteGraph } from '../../../entities/track/lib/taste-graph';
 import { useDragScroll } from '../../../shared/lib/use-drag-scroll';
+import { STORAGE_KEYS } from '../../../shared/config';
 
 interface SearchPageProps {
   searchQuery: string;
@@ -87,7 +88,7 @@ const SearchSlider: React.FC<{
   );
 };
 
-const RECENT_SEARCHES_KEY = 'freakcloud_recent_searches';
+const RECENT_SEARCHES_KEY = STORAGE_KEYS.RECENT_SEARCHES;
 
 const CURATED_DISCOVERY_VIBES = [
   { label: 'Future Garage', icon: 'ri-radar-line', query: 'Future Garage' },

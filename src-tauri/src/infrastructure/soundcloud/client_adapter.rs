@@ -9,7 +9,7 @@ use rsoundcloud::{
 
 use crate::domain::{
     errors::DomainError,
-    models::{PaginatedTracks, Playlist, Track, UserProfile},
+    models::{PaginatedTracks, Playlist, Track, TrackSource, UserProfile},
     ports::SoundCloudGateway,
 };
 
@@ -40,6 +40,8 @@ impl RSoundCloudAdapter {
         };
 
         let http = reqwest::Client::builder()
+            .timeout(std::time::Duration::from_secs(10))
+            .connect_timeout(std::time::Duration::from_secs(5))
             .user_agent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
             .build()
             .map_err(|e| DomainError::Network(e.to_string()))?;
@@ -50,6 +52,28 @@ impl RSoundCloudAdapter {
             current_token: Arc::new(RwLock::new(auth_token)),
             cached_client_id: Arc::new(RwLock::new(cached_client_id)),
         })
+    }
+
+    pub async fn get_client_id(&self) -> Option<String> {
+        let cached = self.cached_client_id.read().await.clone();
+        if let Some(ref id) = cached {
+            if !id.trim().is_empty() {
+                return Some(id.clone());
+            }
+        }
+
+        match SoundCloudClient::generate_client_id().await {
+            Ok(id) if !id.trim().is_empty() => {
+                log::info!("[RSoundCloudAdapter] Generated fresh client_id: {}", id);
+                *self.cached_client_id.write().await = Some(id.clone());
+                Some(id)
+            }
+            Err(e) => {
+                log::warn!("[RSoundCloudAdapter] Failed to generate client_id: {:?}", e);
+                None
+            }
+            _ => None,
+        }
     }
 
     pub async fn ensure_client(&self) -> Result<(), DomainError> {
@@ -63,7 +87,8 @@ impl RSoundCloudAdapter {
         let mut guard = self.client.write().await;
         if guard.is_none() {
             let token = self.current_token.read().await.clone();
-            let sc_client = SoundCloudClient::new(None, token)
+            let client_id = self.get_client_id().await;
+            let sc_client = SoundCloudClient::new(client_id, token)
                 .await
                 .map_err(|e| DomainError::SoundCloud(format!("SoundCloud недоступен (проверьте подключение к сети или запустите zapret / VPN): {:?}", e)))?;
             *guard = Some(sc_client);
@@ -85,6 +110,8 @@ impl RSoundCloudAdapter {
             likes_count: sc.track.likes_count.map(|c| c as u64),
             genre: sc.track.genre.clone(),
             permalink_url: sc.track.permalink_url.clone(),
+            source: TrackSource::SoundCloud,
+            external_id: sc.track.id.to_string(),
         }
     }
 
@@ -99,11 +126,75 @@ impl RSoundCloudAdapter {
             track_count: Some(u.track_count as u64),
         }
     }
+
+    pub async fn resolve_url_to_tracks(&self, url: &str) -> Result<Vec<Track>, DomainError> {
+        self.ensure_client().await?;
+        if self.cached_client_id.read().await.is_none() {
+            if let Ok(id) = SoundCloudClient::generate_client_id().await {
+                *self.cached_client_id.write().await = Some(id);
+            }
+        }
+        let client_id = self.cached_client_id.read().await.clone().unwrap_or_default();
+
+        let mut resolve_url = reqwest::Url::parse("https://api-v2.soundcloud.com/resolve")
+            .map_err(|e| DomainError::SoundCloud(format!("Invalid URL: {}", e)))?;
+        resolve_url.query_pairs_mut().append_pair("url", url);
+        if !client_id.is_empty() {
+            resolve_url.query_pairs_mut().append_pair("client_id", &client_id);
+        }
+
+        let mut req = self.http.get(resolve_url.as_str());
+        if let Some(token) = self.current_token.read().await.as_ref() {
+            req = req.header("Authorization", format!("OAuth {}", token));
+        }
+
+        let resp = req.send().await.map_err(|e| DomainError::Network(e.to_string()))?;
+        if !resp.status().is_success() {
+            return Err(DomainError::Network(format!("Resolve returned HTTP {}", resp.status())));
+        }
+
+        let body: serde_json::Value = resp.json().await.map_err(|e| DomainError::SoundCloud(e.to_string()))?;
+        let kind = body.get("kind").and_then(|k| k.as_str()).unwrap_or("");
+
+        if kind == "track" {
+            if let Some(id) = body.get("id").and_then(|i| i.as_u64()) {
+                let track = self.get_track(id).await?;
+                return Ok(vec![track]);
+            }
+        } else if kind == "playlist" {
+            if let Some(tracks_arr) = body.get("tracks").and_then(|t| t.as_array()) {
+                let mut tracks = Vec::new();
+                for t in tracks_arr {
+                    if let Some(id) = t.get("id").and_then(|i| i.as_u64()) {
+                        if let Ok(tr) = self.get_track(id).await {
+                            tracks.push(tr);
+                        }
+                    }
+                }
+                if !tracks.is_empty() {
+                    return Ok(tracks);
+                }
+            }
+        }
+
+        Ok(Vec::new())
+    }
 }
 
 #[async_trait]
 impl SoundCloudGateway for RSoundCloudAdapter {
     async fn search_tracks(&self, query: &str, limit: u32, offset: u32) -> Result<Vec<Track>, DomainError> {
+        let trimmed = query.trim();
+
+        // If query is a direct SoundCloud URL, resolve it first
+        if trimmed.starts_with("http://") || trimmed.starts_with("https://") || trimmed.contains("soundcloud.com/") {
+            if let Ok(resolved) = self.resolve_url_to_tracks(trimmed).await {
+                if !resolved.is_empty() {
+                    return Ok(resolved);
+                }
+            }
+        }
+
         self.ensure_client().await?;
         let client_guard = self.client.read().await;
         let client = client_guard.as_ref().ok_or_else(|| {
@@ -115,7 +206,7 @@ impl SoundCloudGateway for RSoundCloudAdapter {
         };
 
         let tracks = client
-            .search_tracks(query.to_string(), params)
+            .search_tracks(trimmed.to_string(), params)
             .await
             .map_err(|e| DomainError::SoundCloud(format!("Search failed: {:?}", e)))?;
 
@@ -153,6 +244,7 @@ impl SoundCloudGateway for RSoundCloudAdapter {
                 permalink_url: Some(item.album_playlist.permalink_url),
                 is_album: false,
                 tracks: None,
+                source: Some("soundcloud".to_string()),
             })
             .collect();
 
@@ -188,6 +280,7 @@ impl SoundCloudGateway for RSoundCloudAdapter {
                 permalink_url: Some(item.album_playlist.permalink_url),
                 is_album: true,
                 tracks: None,
+                source: Some("soundcloud".to_string()),
             })
             .collect();
 
@@ -217,6 +310,7 @@ impl SoundCloudGateway for RSoundCloudAdapter {
             permalink_url: Some(p.album_playlist.permalink_url),
             is_album: p.album_playlist.is_album,
             tracks: None,
+            source: Some("soundcloud".to_string()),
         })
     }
 
@@ -271,67 +365,185 @@ impl SoundCloudGateway for RSoundCloudAdapter {
                 .map_err(|e| DomainError::SoundCloud(format!("Failed to fetch track {}: {:?}", track_id, e)))?
         };
 
-        // Find highest quality transcoding:
-        // - Progressive MP3 (128 kbps)
-        // - Any progressive
-        // - HQ tier (quality == "hq", AAC 256kbps or Opus)
-        // - First available
         let transcodings = &sc_track.track.media.transcodings;
-        let target_transcoding = transcodings
-            .iter()
-            .find(|t| t.format.protocol == "progressive" && t.format.mime_type.contains("audio/mpeg"))
-            .or_else(|| transcodings.iter().find(|t| t.format.protocol == "progressive"))
-            .or_else(|| {
-                transcodings
-                    .iter()
-                    .find(|t| {
-                        t.quality.as_str() == "hq"
-                            || t.format.mime_type.contains("aac")
-                            || t.format.mime_type.contains("mp4a")
-                    })
-            })
-            .or_else(|| transcodings.first())
-            .ok_or_else(|| DomainError::StreamNotAvailable(track_id))?;
 
-        // Resolve stream URL using client_id / auth token
-        let mut target_url = reqwest::Url::parse(&target_transcoding.url)
-            .map_err(|e| DomainError::SoundCloud(format!("Invalid stream transcoding URL: {}", e)))?;
+        // Separate real DRM (Widevine/FairPlay) and AES-128 encrypted HLS transcodings.
+        // Note: cbc-encrypted-hls / ctr-encrypted-hls are NOT real DRM — they are standard
+        // HLS with AES-128-CBC/CTR key accessible via #EXT-X-KEY in the m3u8 playlist.
+        // We include them as low-priority fallback candidates.
+        let mut all_drm_only = true; // becomes false if ANY non-real-drm transcoding exists
+        let mut unencrypted: Vec<_> = Vec::new();
+        let mut aes_hls: Vec<_> = Vec::new();
 
-        if !client_id.is_empty() && !target_url.query_pairs().any(|(k, _)| k == "client_id") {
-            target_url.query_pairs_mut().append_pair("client_id", &client_id);
+        for t in transcodings {
+            let proto = t.format.protocol.to_lowercase();
+            // Real DRM: widevine, fairplay, playready — usually indicated by non-HLS protocol names
+            // cbc-encrypted-hls and ctr-encrypted-hls are AES-128 HLS — treat as playable
+            if proto == "cbc-encrypted-hls" || proto == "ctr-encrypted-hls" || proto.contains("encrypted-hls") {
+                aes_hls.push(t);
+                all_drm_only = false;
+            } else if proto.starts_with("widevine") || proto.starts_with("fairplay") || proto.starts_with("playready") {
+                // Real DRM — cannot play without license server
+            } else {
+                unencrypted.push(t);
+                all_drm_only = false;
+            }
         }
 
-        let mut req = self.http.get(target_url.as_str());
-        if let Some(token) = self.current_token.read().await.as_ref() {
-            req = req.header("Authorization", format!("OAuth {}", token));
-        }
+        // Score and sort unencrypted transcodings by playback quality and stability
+        unencrypted.sort_by_key(|t| {
+            let proto = t.format.protocol.as_str();
+            let mime = t.format.mime_type.as_str();
+            if proto == "progressive" && mime.contains("audio/mpeg") {
+                0 // Top priority: Progressive MP3 128kbps (no HLS segment overhead)
+            } else if proto == "progressive" {
+                1 // Any progressive
+            } else if proto == "hls" && (mime.contains("audio/mpeg") || mime.contains("mpegurl")) {
+                2 // HLS MP3
+            } else if proto == "hls" && (mime.contains("aac") || mime.contains("mp4") || mime.contains("mp4a")) {
+                3 // HLS AAC
+            } else {
+                4
+            }
+        });
 
-        let resp = req
-            .send()
-            .await
-            .map_err(|e| DomainError::Network(format!("Failed to resolve stream link: {}", e)))?;
-
-        if !resp.status().is_success() {
-            return Err(DomainError::Network(format!(
-                "Failed to resolve stream link, HTTP status: {}",
-                resp.status()
-            )));
-        }
+        // Append AES-128 HLS candidates after plain unencrypted ones (lower priority)
+        // cbc-encrypted-hls before ctr-encrypted-hls (CBC is more widely supported)
+        aes_hls.sort_by_key(|t| {
+            let proto = t.format.protocol.as_str();
+            if proto == "cbc-encrypted-hls" { 0 } else { 1 }
+        });
+        unencrypted.extend(aes_hls);
 
         #[derive(serde::Deserialize)]
         struct StreamResponse {
             url: String,
         }
 
-        let stream_data: StreamResponse = resp
-            .json()
-            .await
-            .map_err(|e| DomainError::SoundCloud(format!("Failed to parse stream URL response: {}", e)))?;
+        // Try unencrypted transcodings in priority order
+        for target_transcoding in unencrypted {
+            let mut target_url = match reqwest::Url::parse(&target_transcoding.url) {
+                Ok(u) => u,
+                Err(e) => {
+                    log::warn!("Invalid stream transcoding URL {}: {}", target_transcoding.url, e);
+                    continue;
+                }
+            };
 
-        Ok(stream_data.url)
+            if !client_id.is_empty() && !target_url.query_pairs().any(|(k, _)| k == "client_id") {
+                target_url.query_pairs_mut().append_pair("client_id", &client_id);
+            }
+
+            let mut req = self.http.get(target_url.as_str());
+            if let Some(token) = self.current_token.read().await.as_ref() {
+                req = req.header("Authorization", format!("OAuth {}", token));
+            }
+
+            let resp = match req.send().await {
+                Ok(r) => r,
+                Err(e) => {
+                    log::warn!("Failed to query stream URL {}: {}", target_url, e);
+                    continue;
+                }
+            };
+
+            if !resp.status().is_success() {
+                let status = resp.status();
+                let body = resp.text().await.unwrap_or_default();
+                log::warn!(
+                    "[resolve_stream_url] Transcoding proto={} returned HTTP {} body={:?}, trying next...",
+                    target_transcoding.format.protocol,
+                    status,
+                    &body[..body.len().min(200)]
+                );
+                continue;
+            }
+
+            match resp.json::<StreamResponse>().await {
+                Ok(stream_data) if !stream_data.url.is_empty() => return Ok(stream_data.url),
+                Ok(_) => continue,
+                Err(e) => {
+                    log::warn!("Failed to parse stream URL response: {}", e);
+                    continue;
+                }
+            }
+        }
+
+        if all_drm_only {
+            return Err(DomainError::DrmProtected(
+                "Трек защищен DRM авторскими правами SoundCloud и недоступен для стороннего воспроизведения".to_string(),
+            ));
+        }
+
+        Err(DomainError::StreamNotAvailable(track_id))
     }
 
     async fn get_me(&self) -> Result<UserProfile, DomainError> {
+        // 1. Попытка прямого HTTP-запроса к API v2 с валидным client_id и OAuth-токеном
+        let current_tok = self.current_token.read().await.clone();
+        if let Some(token) = current_tok {
+            let raw_token = if token.starts_with("OAuth ") {
+                token.trim_start_matches("OAuth ").trim().to_string()
+            } else {
+                token.trim().to_string()
+            };
+
+            if !raw_token.is_empty() {
+                let client_id = self.get_client_id().await;
+                let mut url = reqwest::Url::parse("https://api-v2.soundcloud.com/me")
+                    .map_err(|e| DomainError::SoundCloud(e.to_string()))?;
+
+                if let Some(ref cid) = client_id {
+                    url.query_pairs_mut().append_pair("client_id", cid);
+                }
+
+                let req = self.http.get(url.as_str())
+                    .header("Authorization", format!("OAuth {}", raw_token))
+                    .header("Accept", "application/json; charset=utf-8")
+                    .header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36");
+
+                match req.send().await {
+                    Ok(resp) if resp.status().is_success() => {
+                        #[derive(serde::Deserialize)]
+                        struct ScMeResponse {
+                            id: u64,
+                            username: String,
+                            full_name: Option<String>,
+                            avatar_url: Option<String>,
+                            permalink_url: Option<String>,
+                            followers_count: Option<u64>,
+                            track_count: Option<u64>,
+                        }
+
+                        match resp.json::<ScMeResponse>().await {
+                            Ok(user) => {
+                                log::info!("[RSoundCloudAdapter] Verified user via direct /me: {}", user.username);
+                                return Ok(UserProfile {
+                                    id: user.id,
+                                    username: user.username,
+                                    full_name: user.full_name,
+                                    avatar_url: user.avatar_url,
+                                    permalink_url: user.permalink_url.unwrap_or_default(),
+                                    followers_count: user.followers_count,
+                                    track_count: user.track_count,
+                                });
+                            }
+                            Err(e) => {
+                                log::warn!("[RSoundCloudAdapter] Direct /me JSON parse error: {:?}", e);
+                            }
+                        }
+                    }
+                    Ok(resp) => {
+                        log::warn!("[RSoundCloudAdapter] Direct /me returned HTTP {}", resp.status());
+                    }
+                    Err(e) => {
+                        log::warn!("[RSoundCloudAdapter] Direct /me network error: {:?}", e);
+                    }
+                }
+            }
+        }
+
+        // 2. Фолбэк через rsoundcloud client
         self.ensure_client().await?;
         let client_guard = self.client.read().await;
         let client = client_guard.as_ref().ok_or_else(|| {
@@ -438,6 +650,8 @@ impl SoundCloudGateway for RSoundCloudAdapter {
                     likes_count: t.likes_count,
                     genre: t.genre,
                     permalink_url: t.permalink_url.unwrap_or_default(),
+                    source: TrackSource::SoundCloud,
+                    external_id: t.id.to_string(),
                 });
             } else if let Some(id) = item.id {
                 let (artist, artist_id) = match item.user {
@@ -457,6 +671,8 @@ impl SoundCloudGateway for RSoundCloudAdapter {
                     likes_count: item.likes_count,
                     genre: item.genre,
                     permalink_url: item.permalink_url.unwrap_or_default(),
+                    source: TrackSource::SoundCloud,
+                    external_id: id.to_string(),
                 });
             }
         }
@@ -476,7 +692,8 @@ impl SoundCloudGateway for RSoundCloudAdapter {
         let mut client_guard = self.client.write().await;
         *self.current_token.write().await = token.clone();
 
-        match SoundCloudClient::new(None, token.clone()).await {
+        let client_id = self.get_client_id().await;
+        match SoundCloudClient::new(client_id, token.clone()).await {
             Ok(mut new_client) => {
                 new_client.set_auth_token(token);
                 *client_guard = Some(new_client);
@@ -487,6 +704,16 @@ impl SoundCloudGateway for RSoundCloudAdapter {
                 Err(DomainError::SoundCloud(format!("Failed to re-initialize client: {:?}", e)))
             }
         }
+    }
+
+    async fn set_client_id(&self, client_id: Option<String>) -> Result<(), DomainError> {
+        if let Some(ref cid) = client_id {
+            if !cid.trim().is_empty() {
+                log::info!("[RSoundCloudAdapter] Client ID updated from browser: {}", cid);
+                *self.cached_client_id.write().await = Some(cid.trim().to_string());
+            }
+        }
+        Ok(())
     }
 
     async fn like_track(&self, track_id: u64) -> Result<(), DomainError> {
@@ -629,6 +856,21 @@ impl SoundCloudGateway for RSoundCloudAdapter {
         }
 
         #[derive(serde::Deserialize)]
+        struct RelatedFormatData {
+            protocol: Option<String>,
+        }
+
+        #[derive(serde::Deserialize)]
+        struct RelatedTranscoding {
+            format: Option<RelatedFormatData>,
+        }
+
+        #[derive(serde::Deserialize)]
+        struct RelatedMediaData {
+            transcodings: Option<Vec<RelatedTranscoding>>,
+        }
+
+        #[derive(serde::Deserialize)]
         struct RelatedTrackData {
             id: u64,
             title: String,
@@ -640,6 +882,9 @@ impl SoundCloudGateway for RSoundCloudAdapter {
             likes_count: Option<u64>,
             genre: Option<String>,
             permalink_url: Option<String>,
+            policy: Option<String>,
+            streamable: Option<bool>,
+            media: Option<RelatedMediaData>,
         }
 
         #[derive(serde::Deserialize)]
@@ -655,6 +900,9 @@ impl SoundCloudGateway for RSoundCloudAdapter {
             likes_count: Option<u64>,
             genre: Option<String>,
             permalink_url: Option<String>,
+            policy: Option<String>,
+            streamable: Option<bool>,
+            media: Option<RelatedMediaData>,
         }
 
         #[derive(serde::Deserialize)]
@@ -666,12 +914,30 @@ impl SoundCloudGateway for RSoundCloudAdapter {
         let station_url = format!("https://api-v2.soundcloud.com/stations/soundcloud:track-stations:{}/tracks?limit={}", track_id, limit);
         let related_url = format!("https://api-v2.soundcloud.com/tracks/{}/related?limit={}", track_id, limit);
 
+        if self.cached_client_id.read().await.is_none() {
+            if let Ok(id) = SoundCloudClient::generate_client_id().await {
+                *self.cached_client_id.write().await = Some(id);
+            }
+        }
+        let client_id = self.cached_client_id.read().await.clone().unwrap_or_default();
+
+        let mut station_target = reqwest::Url::parse(&station_url).map_err(|e| DomainError::SoundCloud(e.to_string()))?;
+        let mut related_target = reqwest::Url::parse(&related_url).map_err(|e| DomainError::SoundCloud(e.to_string()))?;
+        if !client_id.is_empty() {
+            if !station_target.query_pairs().any(|(k, _)| k == "client_id") {
+                station_target.query_pairs_mut().append_pair("client_id", &client_id);
+            }
+            if !related_target.query_pairs().any(|(k, _)| k == "client_id") {
+                related_target.query_pairs_mut().append_pair("client_id", &client_id);
+            }
+        }
+
         let token = self.current_token.read().await.clone();
 
         let mut data: Option<RelatedResponse> = None;
 
         // 1. Попытка получить через track-stations (дает более высокое качество подборки и радио-поток)
-        let mut req = self.http.get(&station_url).header("Accept", "application/json");
+        let mut req = self.http.get(station_target.as_str()).header("Accept", "application/json");
         if let Some(ref t) = token {
             if !t.trim().is_empty() {
                 req = req.header("Authorization", format!("OAuth {}", t.trim()));
@@ -692,7 +958,7 @@ impl SoundCloudGateway for RSoundCloudAdapter {
 
         // 2. Если track-stations не вернул треков, пробуем fallback на /tracks/{id}/related
         if data.is_none() {
-            let mut req = self.http.get(&related_url).header("Accept", "application/json");
+            let mut req = self.http.get(related_target.as_str()).header("Accept", "application/json");
             if let Some(ref t) = token {
                 if !t.trim().is_empty() {
                     req = req.header("Authorization", format!("OAuth {}", t.trim()));
@@ -709,10 +975,46 @@ impl SoundCloudGateway for RSoundCloudAdapter {
 
         let data = data.ok_or_else(|| DomainError::SoundCloud("Failed to fetch tracks from track-station or related".to_string()))?;
 
+        let is_streamable = |policy: &Option<String>, streamable: &Option<bool>, media: &Option<RelatedMediaData>| -> bool {
+            if let Some(p) = policy {
+                let p_upper = p.to_uppercase();
+                if p_upper == "BLOCK" || p_upper == "SNIP" {
+                    return false;
+                }
+            }
+            if let Some(false) = streamable {
+                return false;
+            }
+            if let Some(m) = media {
+                if let Some(ref list) = m.transcodings {
+                    if !list.is_empty() {
+                        let has_playable = list.iter().any(|tr| {
+                            if let Some(ref f) = tr.format {
+                                if let Some(ref proto) = f.protocol {
+                                    let proto_lower = proto.to_lowercase();
+                                    return !proto_lower.starts_with("widevine")
+                                        && !proto_lower.starts_with("fairplay")
+                                        && !proto_lower.starts_with("playready");
+                                }
+                            }
+                            true
+                        });
+                        if !has_playable {
+                            return false;
+                        }
+                    }
+                }
+            }
+            true
+        };
+
         let mut tracks = Vec::new();
         if let Some(items) = data.collection {
             for item in items {
                 if let Some(t) = item.track {
+                    if !is_streamable(&t.policy, &t.streamable, &t.media) {
+                        continue;
+                    }
                     tracks.push(Track {
                         id: t.id,
                         title: t.title,
@@ -726,8 +1028,13 @@ impl SoundCloudGateway for RSoundCloudAdapter {
                         likes_count: t.likes_count,
                         genre: t.genre,
                         permalink_url: t.permalink_url.unwrap_or_default(),
+                        source: TrackSource::SoundCloud,
+                        external_id: t.id.to_string(),
                     });
                 } else if let Some(id) = item.id {
+                    if !is_streamable(&item.policy, &item.streamable, &item.media) {
+                        continue;
+                    }
                     let (artist, artist_id) = match item.user {
                         Some(u) => (u.username.unwrap_or_else(|| "SoundCloud Artist".to_string()), u.id),
                         None => ("SoundCloud Artist".to_string(), None),
@@ -745,6 +1052,8 @@ impl SoundCloudGateway for RSoundCloudAdapter {
                         likes_count: item.likes_count,
                         genre: item.genre,
                         permalink_url: item.permalink_url.unwrap_or_default(),
+                        source: TrackSource::SoundCloud,
+                        external_id: id.to_string(),
                     });
                 }
             }

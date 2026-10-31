@@ -1,8 +1,7 @@
 import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
 import type { CacheStats, Track } from './types';
 import { tauriApi } from '../../../shared/api/tauri-client';
-
-const AUTO_CACHE_STORAGE_KEY = 'freakcloud_auto_cache';
+import { STORAGE_KEYS } from '../../../shared/config';
 
 interface CacheContextValue {
   cachedIds: Set<number>;
@@ -30,7 +29,7 @@ export const CacheProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   const [autoCache, setAutoCacheState] = useState<boolean>(() => {
     try {
-      const saved = localStorage.getItem(AUTO_CACHE_STORAGE_KEY);
+      const saved = localStorage.getItem(STORAGE_KEYS.AUTO_CACHE);
       return saved !== null ? saved === 'true' : false;
     } catch {
       return false;
@@ -40,7 +39,7 @@ export const CacheProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const setAutoCache = useCallback((enabled: boolean) => {
     setAutoCacheState(enabled);
     try {
-      localStorage.setItem(AUTO_CACHE_STORAGE_KEY, String(enabled));
+      localStorage.setItem(STORAGE_KEYS.AUTO_CACHE, String(enabled));
     } catch (err) {
       console.error('Failed to save autoCache setting:', err);
     }

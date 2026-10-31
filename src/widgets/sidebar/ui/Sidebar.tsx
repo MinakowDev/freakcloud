@@ -3,7 +3,7 @@ import { useTranslation } from '../../../shared/lib/i18n';
 import { useSession } from '../../../entities/session/model/session-context';
 import './SidebarGlider.css';
 
-export type PageView = 'home' | 'search' | 'library' | 'taste-graph' | 'settings';
+export type PageView = 'home' | 'search' | 'library' | 'history' | 'taste-graph' | 'settings';
 
 interface SidebarProps {
   currentPage: PageView;
@@ -12,13 +12,12 @@ interface SidebarProps {
 
 export const Sidebar: React.FC<SidebarProps> = ({ currentPage, onNavigate }) => {
   const { messages } = useTranslation();
-  const { session } = useSession();
+  const { session, openOAuthModal } = useSession();
 
   const navItems: { id: PageView; label: string; icon: string }[] = [
     { id: 'home', label: messages.nav.home, icon: 'ri-home-5-line' },
     { id: 'search', label: messages.nav.search, icon: 'ri-search-line' },
     { id: 'library', label: messages.nav.library, icon: 'ri-folder-music-line' },
-    // { id: 'taste-graph', label: messages.nav.taste_graph, icon: 'ri-bubble-chart-line' },
   ];
 
   return (
@@ -61,6 +60,22 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentPage, onNavigate }) => 
               <div className="glider" />
             </div>
           </div>
+
+          {/* History separate navigation button */}
+          <div className="pt-1">
+            <button
+              type="button"
+              onClick={() => onNavigate('history')}
+              className={`flex items-center gap-3 px-3.5 py-2.5 rounded-lg transition-colors cursor-pointer text-left w-full ${
+                currentPage === 'history'
+                  ? 'bg-zinc-900 text-white font-medium border border-zinc-800'
+                  : 'text-zinc-400 hover:bg-zinc-900/60 hover:text-white'
+              }`}
+            >
+              <i className="ri-history-line text-lg leading-none"></i>
+              <span className="font-body-md text-sm">{messages.nav.history || 'История'}</span>
+            </button>
+          </div>
         </div>
       </div>
 
@@ -78,8 +93,8 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentPage, onNavigate }) => 
           <span className="font-body-md text-sm">{messages.nav.settings}</span>
         </button>
 
-        {session.is_authenticated && session.user && (
-          <div className="flex items-center gap-space-sm px-space-md py-2 bg-zinc-900/80 rounded-lg border border-zinc-800">
+        {session.is_authenticated && session.user ? (
+          <div className="flex items-center gap-space-sm px-space-md py-2 bg-zinc-900/80 rounded-md border border-zinc-800">
             {session.user.avatar_url ? (
               <img src={session.user.avatar_url} alt="" className="w-6 h-6 rounded-full object-cover" />
             ) : (
@@ -89,6 +104,18 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentPage, onNavigate }) => 
               {session.user.username}
             </span>
           </div>
+        ) : (
+          <button
+            type="button"
+            onClick={openOAuthModal}
+            className="flex items-center gap-2.5 px-3 py-2 rounded-md transition-colors cursor-pointer text-left w-full bg-[#0a0a0a] hover:bg-[#141414] text-zinc-300 hover:text-white border border-[#1f1f23]"
+          >
+            <i className="ri-puzzle-line text-base text-zinc-400"></i>
+            <div className="flex flex-col flex-1 min-w-0">
+              <span className="text-xs font-semibold truncate text-white">{messages.auth.extension_login_btn}</span>
+              <span className="text-[10px] text-zinc-500 truncate font-mono">SoundCloud Sync</span>
+            </div>
+          </button>
         )}
       </div>
     </aside>

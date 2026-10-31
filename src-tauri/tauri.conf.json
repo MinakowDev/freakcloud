@@ -25,15 +25,15 @@
         "title": "freakcloud-tray",
         "label": "tray-widget",
         "url": "/index.html?view=tray-widget",
-        "width": 340,
-        "height": 140,
+        "width": 360,
+        "height": 230,
         "resizable": false,
         "decorations": false,
         "transparent": true,
         "alwaysOnTop": true,
         "visible": false,
         "skipTaskbar": true,
-        "shadow": true
+        "shadow": false
       }
     ],
     "security": {

@@ -21,6 +21,7 @@ impl GetTrendingUseCase {
         };
 
         let limit = limit.unwrap_or(20).clamp(1, 50);
+
         self.gateway.get_trending(genre, limit).await
     }
 }

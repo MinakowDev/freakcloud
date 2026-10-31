@@ -11,4 +11,5 @@ export interface Playlist {
   permalink_url?: string;
   is_album: boolean;
   tracks?: Track[];
+  source?: 'yandex' | 'spotify' | 'soundcloud' | 'text' | string;
 }
