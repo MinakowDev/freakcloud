@@ -1,6 +1,7 @@
 use std::{
     fs::File,
-    io::{BufReader, Cursor},
+    io::{BufReader, Cursor, Read, Seek},
+    panic::{catch_unwind, AssertUnwindSafe},
     path::PathBuf,
     sync::{
         atomic::{AtomicBool, AtomicU64, Ordering},
@@ -13,7 +14,7 @@ use std::{
 use aes::Aes128;
 use cbc::cipher::{block_padding::Pkcs7, BlockDecryptMut, KeyIvInit};
 use async_trait::async_trait;
-use rodio::{Decoder, OutputStream, Sink, Source};
+use rodio::{mixer::Mixer, Decoder, DeviceSinkBuilder, Player, Source};
 use tauri::{AppHandle, Emitter};
 use tokio::sync::{mpsc, oneshot, RwLock as TokioRwLock};
 
@@ -24,6 +25,29 @@ use crate::domain::{
     models::PlaybackStatus,
     ports::{AudioPlayerPort, AudioPlayerState},
 };
+
+fn truncate_for_log(value: &str, max_chars: usize) -> String {
+    value.chars().take(max_chars).collect()
+}
+
+fn build_decoder<R>(data: R, byte_len: u64) -> Result<Decoder<R>, String>
+where
+    R: Read + Seek + Send + Sync + 'static,
+{
+    let result = catch_unwind(AssertUnwindSafe(|| {
+        Decoder::builder()
+            .with_data(data)
+            .with_byte_len(byte_len)
+            .with_seekable(true)
+            .build()
+            .map_err(|e| format!("Decode error: {:?}", e))
+    }));
+
+    match result {
+        Ok(decoder) => decoder,
+        Err(_) => Err("Decoder crashed while opening the stream".to_string()),
+    }
+}
 
 enum AudioWorkerCommand {
     LoadBytes {
@@ -73,21 +97,15 @@ impl RodioAudioPlayer {
         thread::Builder::new()
             .name("freakcloud-audio-worker".to_string())
             .spawn(move || {
-                let (_stream, stream_handle) = match OutputStream::try_default() {
+                let device_sink = match DeviceSinkBuilder::open_default_sink() {
                     Ok(s) => s,
                     Err(e) => {
                         log::error!("[RodioAudioPlayer] Failed to open default audio stream: {:?}", e);
                         return;
                     }
                 };
-
-                let mut sink = match Sink::try_new(&stream_handle) {
-                    Ok(s) => s,
-                    Err(e) => {
-                        log::error!("[RodioAudioPlayer] Failed to create audio sink: {:?}", e);
-                        return;
-                    }
-                };
+                let mixer = device_sink.mixer().clone();
+                let mut player = Player::connect_new(&mixer);
 
                 #[derive(Clone)]
                 enum ActiveSource {
@@ -103,50 +121,50 @@ impl RodioAudioPlayer {
                 let is_playing = Arc::new(AtomicBool::new(false));
                 let mut active_source: Option<ActiveSource> = None;
 
-                let recreate_sink_from_source = |stream_handle: &rodio::OutputStreamHandle,
-                                                 src: &ActiveSource,
-                                                 target_vol: f32,
-                                                 muted: bool,
-                                                 seek_to: Option<Duration>|
-                 -> Result<(Sink, f64), String> {
-                    let new_sink = Sink::try_new(stream_handle)
-                        .map_err(|e| format!("Sink creation error: {:?}", e))?;
+                let recreate_player_from_source = |mixer: &Mixer,
+                                                   src: &ActiveSource,
+                                                   target_vol: f32,
+                                                   muted: bool,
+                                                   seek_to: Option<Duration>|
+                 -> Result<(Player, f64), String> {
+                    let new_player = Player::connect_new(mixer);
                     let duration = match src {
                         ActiveSource::Bytes(data) => {
-                            let cursor = BufReader::new(Cursor::new(data.clone()));
-                            let source = Decoder::new(cursor)
-                                .map_err(|e| format!("Decode error: {:?}", e))?;
+                            let source = build_decoder(Cursor::new(data.clone()), data.len() as u64)?;
                             let dur = source
                                 .total_duration()
                                 .map(|d| d.as_secs_f64())
                                 .unwrap_or(0.0);
-                            new_sink.append(source);
+                            new_player.append(source);
                             dur
                         }
                         ActiveSource::File(path) => {
                             let file = File::open(path)
                                 .map_err(|e| format!("File open error: {:?}", e))?;
-                            let source = Decoder::new(BufReader::new(file))
-                                .map_err(|e| format!("Decode error: {:?}", e))?;
+                            let byte_len = file
+                                .metadata()
+                                .map_err(|e| format!("File metadata error: {:?}", e))?
+                                .len();
+                            let source = build_decoder(BufReader::new(file), byte_len)?;
                             let dur = source
                                 .total_duration()
                                 .map(|d| d.as_secs_f64())
                                 .unwrap_or(0.0);
-                            new_sink.append(source);
+                            new_player.append(source);
                             dur
                         }
                     };
                     let eff_vol = if muted { 0.0 } else { target_vol };
-                    new_sink.set_volume(eff_vol);
+                    new_player.set_volume(eff_vol);
                     if let Some(pos) = seek_to {
                         if pos > Duration::ZERO {
-                            let _ = new_sink.try_seek(pos);
+                            let _ = new_player.try_seek(pos);
                         }
                     }
-                    Ok((new_sink, duration))
+                    Ok((new_player, duration))
                 };
 
-                sink.set_volume(target_volume);
+                player.set_volume(target_volume);
                 let mut last_time_emit = Instant::now();
 
                 loop {
@@ -159,7 +177,7 @@ impl RodioAudioPlayer {
                                     continue;
                                 }
                                 active_seq = seq;
-                                sink.stop();
+                                player.stop();
 
                                 let len = bytes.len();
                                 let audio_data = if bytes.starts_with(b"ID3") {
@@ -169,11 +187,11 @@ impl RodioAudioPlayer {
                                     bytes.clone()
                                 };
                                 let src = ActiveSource::Bytes(audio_data);
-                                match recreate_sink_from_source(&stream_handle, &src, target_volume, is_muted, None) {
-                                    Ok((new_sink, dur)) => {
-                                        sink = new_sink;
+                                match recreate_player_from_source(&mixer, &src, target_volume, is_muted, None) {
+                                    Ok((new_player, dur)) => {
+                                        player = new_player;
                                         current_duration = dur;
-                                        sink.play();
+                                        player.play();
                                         has_track = true;
                                         is_playing.store(true, Ordering::SeqCst);
                                         active_source = Some(src);
@@ -194,14 +212,14 @@ impl RodioAudioPlayer {
                                     continue;
                                 }
                                 active_seq = seq;
-                                sink.stop();
+                                player.stop();
 
                                 let src = ActiveSource::File(path);
-                                match recreate_sink_from_source(&stream_handle, &src, target_volume, is_muted, None) {
-                                    Ok((new_sink, dur)) => {
-                                        sink = new_sink;
+                                match recreate_player_from_source(&mixer, &src, target_volume, is_muted, None) {
+                                    Ok((new_player, dur)) => {
+                                        player = new_player;
                                         current_duration = dur;
-                                        sink.play();
+                                        player.play();
                                         has_track = true;
                                         is_playing.store(true, Ordering::SeqCst);
                                         active_source = Some(src);
@@ -217,22 +235,22 @@ impl RodioAudioPlayer {
                                 }
                             }
                             AudioWorkerCommand::Play => {
-                                if has_track && !sink.empty() {
-                                    sink.play();
+                                if has_track && !player.empty() {
+                                    player.play();
                                     is_playing.store(true, Ordering::SeqCst);
                                 } else if let Some(ref src) = active_source {
-                                    sink.stop();
-                                    if let Ok((new_sink, dur)) = recreate_sink_from_source(&stream_handle, src, target_volume, is_muted, None) {
-                                        sink = new_sink;
+                                    player.stop();
+                                    if let Ok((new_player, dur)) = recreate_player_from_source(&mixer, src, target_volume, is_muted, None) {
+                                        player = new_player;
                                         current_duration = dur;
-                                        sink.play();
+                                        player.play();
                                         has_track = true;
                                         is_playing.store(true, Ordering::SeqCst);
                                     }
                                 }
                             }
                             AudioWorkerCommand::Pause => {
-                                sink.pause();
+                                player.pause();
                                 is_playing.store(false, Ordering::SeqCst);
                             }
                             AudioWorkerCommand::Seek(sec) => {
@@ -240,23 +258,23 @@ impl RodioAudioPlayer {
                                 let was_playing = is_playing.load(Ordering::SeqCst);
                                 let mut seek_success = false;
 
-                                if has_track && !sink.empty() {
-                                    if sink.try_seek(d).is_ok() {
+                                if has_track && !player.empty() {
+                                    if player.try_seek(d).is_ok() {
                                         seek_success = true;
                                     }
                                 }
 
                                 if !seek_success {
                                     if let Some(ref src) = active_source {
-                                        sink.stop();
-                                        if let Ok((new_sink, dur)) = recreate_sink_from_source(&stream_handle, src, target_volume, is_muted, Some(d)) {
-                                            sink = new_sink;
+                                        player.stop();
+                                        if let Ok((new_player, dur)) = recreate_player_from_source(&mixer, src, target_volume, is_muted, Some(d)) {
+                                            player = new_player;
                                             current_duration = dur;
                                             has_track = true;
                                             if was_playing {
-                                                sink.play();
+                                                player.play();
                                             } else {
-                                                sink.pause();
+                                                player.pause();
                                             }
                                         }
                                     }
@@ -265,15 +283,15 @@ impl RodioAudioPlayer {
                             AudioWorkerCommand::SetVolume(v) => {
                                 target_volume = v.clamp(0.0, 2.0);
                                 if !is_muted {
-                                    sink.set_volume(target_volume);
+                                    player.set_volume(target_volume);
                                 }
                             }
                             AudioWorkerCommand::SetMuted(m) => {
                                 is_muted = m;
-                                sink.set_volume(if is_muted { 0.0 } else { target_volume });
+                                player.set_volume(if is_muted { 0.0 } else { target_volume });
                             }
                             AudioWorkerCommand::Stop => {
-                                sink.stop();
+                                player.stop();
                                 has_track = false;
                                 active_source = None;
                                 is_playing.store(false, Ordering::SeqCst);
@@ -283,12 +301,12 @@ impl RodioAudioPlayer {
 
                     // Progress and status tracking
                     let cur_time = if has_track {
-                        sink.get_pos().as_secs_f64()
+                        player.get_pos().as_secs_f64()
                     } else {
                         0.0
                     };
 
-                    let ended = has_track && sink.empty();
+                    let ended = has_track && player.empty();
                     if ended {
                         has_track = false;
                         is_playing.store(false, Ordering::SeqCst);
@@ -379,7 +397,7 @@ impl AudioPlayerPort for RodioAudioPlayer {
                 })
                 .map_err(|e| DomainError::Playback(format!("Worker channel closed: {}", e)))?;
         } else {
-            log::info!("[RodioPlayer] load_and_play url={}", &url_or_path[..url_or_path.len().min(120)]);
+            log::info!("[RodioPlayer] load_and_play url={}", truncate_for_log(&url_or_path, 120));
             let resp = self
                 .http
                 .get(&url_or_path)
@@ -390,7 +408,7 @@ impl AudioPlayerPort for RodioAudioPlayer {
             if !resp.status().is_success() {
                 let status = resp.status();
                 let body = resp.text().await.unwrap_or_default();
-                log::error!("[RodioPlayer] Initial fetch HTTP {} body={:?}", status, &body[..body.len().min(200)]);
+                log::error!("[RodioPlayer] Initial fetch HTTP {} body={:?}", status, truncate_for_log(&body, 200));
                 return Err(DomainError::Network(format!(
                     "Failed to stream track, HTTP status: {}",
                     status
@@ -411,7 +429,7 @@ impl AudioPlayerPort for RodioAudioPlayer {
                 let mut m3u8_text = String::from_utf8_lossy(&audio_bytes).to_string();
                 log::info!("[RodioPlayer] Detected HLS playlist, {} chars, preview={:?}",
                     m3u8_text.len(),
-                    &m3u8_text[..m3u8_text.len().min(800)]
+                    truncate_for_log(&m3u8_text, 800)
                 );
 
                 // If this is a master/variant playlist (contains child .m3u8), resolve the child playlist first
@@ -527,7 +545,7 @@ impl AudioPlayerPort for RodioAudioPlayer {
                             } else {
                                 map_path
                             };
-                            log::info!("[RodioPlayer] Fetching EXT-X-MAP init segment from {}", &map_url[..map_url.len().min(120)]);
+                            log::info!("[RodioPlayer] Fetching EXT-X-MAP init segment from {}", truncate_for_log(&map_url, 120));
                             match self.http.get(&map_url).send().await {
                                 Ok(r) if r.status().is_success() => {
                                     match r.bytes().await {

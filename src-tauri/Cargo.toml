@@ -31,7 +31,7 @@ async-trait = "0.1"
 thiserror = "2"
 dirs = "6.0"
 discord-rich-presence = "1.1.0"
-rodio = { version = "0.20", features = ["symphonia-all"] }
+rodio = { version = "0.23", features = ["symphonia-all"] }
 log = "0.4"
 tauri-plugin-log = "2"
 aes = "0.8"
@@ -44,5 +44,4 @@ mimalloc = { version = "0.1", default-features = false }
 codegen-units = 1
 lto = true
 opt-level = 3
-panic = "abort"
 strip = true
