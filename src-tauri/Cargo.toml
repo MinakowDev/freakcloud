@@ -1,6 +1,6 @@
 [package]
 name = "freakcloud"
-version = "0.1.1"
+version = "0.1.2"
 description = "High-performance native music player for SoundCloud"
 authors = ["you"]
 edition = "2021"
